@@ -1,0 +1,4 @@
+(executable
+ (public_name scratch_compiler)
+ (name main)
+ (libraries scratch_compiler))

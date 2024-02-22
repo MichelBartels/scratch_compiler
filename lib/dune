@@ -1,0 +1,4 @@
+(library
+ (name scratch_compiler))
+(ocamllex lexer)
+(ocamlyacc parser)
