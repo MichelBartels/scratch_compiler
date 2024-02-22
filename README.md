@@ -6,3 +6,5 @@ There is currently no I/O. The only output is the values of the variables at the
 It takes as input the `project.json` of a scratch project. It can be obtained by unzipping `.sb3` file. The file path is currently hard coded as `example_code/project.json`.
 
 The `project.json` is parsed by a mostly standard compliant JSON parser. However, I didn't implement escape codes because it wasn't necessary for correctly processing the code.
+
+It can be executed using `dune exec scratch_compiler`.
