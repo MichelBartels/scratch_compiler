@@ -1,4 +1,5 @@
 (library
- (name scratch_compiler))
+ (name scratch_compiler)
+ (preprocess (pps ppx_deriving.show)))
 (ocamllex lexer)
 (ocamlyacc parser)

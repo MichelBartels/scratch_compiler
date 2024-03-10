@@ -1,51 +1,42 @@
-open Ast
+(*open Ast
 open Assoc_list
-open Pp
-open Format
 
 type state = {
-    variables: (string * float) list;
-    arguments: (string * float) list;
+    variables: (string * scratch_value) list;
+    arguments: (string * scratch_value) list;
 }
+[@@ deriving show]
 
-let pp_var ppf (str, n) =
-    fprintf ppf "%s: %s" str (string_of_float n)
-let pp_vars = pp_list pp_var
-
-let pp_state ppf { variables; arguments } =
-    fprintf ppf "state: [variables: %a arguments: %a]" pp_vars variables pp_vars arguments
-let print_state = print_pp pp_state
-
-
-let rec interp_number_expr program state = function
-    | Variable var -> (match search_assoc_list var state.variables with
-        | Some v -> v
+let rec interp_expr program state = function
+    | Variable var -> (match Assoc_list.search var state.variables with
+        | Some v -> Some v
         | None -> failwith "could not find variable")
-    | Argument arg -> (match search_assoc_list arg state.arguments with
-        | Some v -> v
+    | Argument arg -> (match Assoc_list.search arg state.arguments with
+        | Some v -> Some v
         | None -> failwith @@ "could not find argument: " ^ arg)
-    | Literal n -> n
-    | Add (n1, n2) -> (interp_number_expr program state n1) +. (interp_number_expr program state n2)
-    | Subtract (n1, n2) -> (interp_number_expr program state n1) -. (interp_number_expr program state n2)
-
-let interp_bool_expr program state = function
-    | GreaterThan (n1, n2) -> (interp_number_expr program state n1) > (interp_number_expr program state n2)
-
-let rec interp_statements program state = function
-    | (FuncCall (f, args))::statements -> (match search_assoc_list f program.functions with
-        | Some f -> (let vars = (interp_statements program { variables = state.variables; arguments = List.map (fun (k, v) -> (k, interp_number_expr program state v)) args } f.statements).variables (* might add parameter check *)
+    | Literal l -> Some l
+    | BinaryOperator (op, n1, n2) -> 
+    | (FuncCall (f, args))::statements -> (match Assoc_list.search f program.functions with
+        | Some f -> (let vars = (interp_statements program { variables = state.variables; arguments = List.map (fun (k, v) -> (k, interp_expr program state v)) args } f.statements).variables (* might add parameter check *)
         in interp_statements program { variables = vars; arguments = state.arguments } statements)
         | None -> failwith "could not find function"
     )
     | (Branch (cond, then_branch, else_branch))::statements ->
-        (let vars = if interp_bool_expr program state cond then (interp_statements program state then_branch).variables else (interp_statements program state else_branch).variables
+        (let vars = if (match interp_expr program state cond with
+            | BoolValue b -> b
+            | _ -> failwith "if only accepts booleans as conditions"
+        ) then (interp_statements program state then_branch).variables else (interp_statements program state else_branch).variables
         in interp_statements program { variables = vars; arguments = state.arguments } statements)
     | (SetVariable (name, value))::statements ->
-        (let vars = update_assoc_list name (interp_number_expr program state value) state.variables
+        (let vars = update_assoc_list name (interp_expr program state value) state.variables
+        in interp_statements program { variables = vars; arguments = state.arguments } statements)
+    | (Push (name, value))::statements -> 
+        (let list = ListValue ((interp_expr program state value)::(match Assoc_list.search name state.variables with Some (ListValue xs) -> xs | _ -> failwith "updating value that does not exist or is not a list"))
+        in let vars = update_assoc_list name list state.variables
         in interp_statements program { variables = vars; arguments = state.arguments } statements)
     | [] -> state
 
-let interp_program (program: Ast.program) =
+let interp_program (program: program) =
     let state = { arguments = []; variables = program.variables }
     in interp_statements program state program.main
-
+*)
