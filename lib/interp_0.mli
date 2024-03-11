@@ -1,4 +1,4 @@
-type state
+(*type state
+[@@ deriving show]
 
-val print_state: state -> unit
-val interp_program: Ast.program -> state
+val interp_program: Ast.program -> state*)

@@ -1,8 +1,10 @@
-let test = "example_code/ack/project.json"
+let test = "example_code/turing/project.json"
 
 open Scratch_compiler
 
-let program = Front_end.front_end test
+let () = Printexc.record_backtrace true
 
-let result = Interp_0.interp_program program
-let _ = print_string "\n"; Interp_0.print_state result
+let program = Front_end.front_end test
+let () = print_endline @@ Typed_ast.show_program program
+let (_, result) = Interp.interp program
+let () = print_endline @@ Interp.show_state result

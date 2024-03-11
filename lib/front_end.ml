@@ -25,7 +25,7 @@ let init_lexbuf file =
 let parse (file, lexbuf) = 
     let e = try Parser.main Lexer.token lexbuf 
             with Parsing.Parse_error -> parse_error file lexbuf 
-    in let _ = peek "Parsed result" e Past.string_of_value 
+    in let _ = peek "Parsed result" e Past.show_value 
     in (file, e) 
 
-let front_end file = Past_to_ast.translate_past (match (parse (init_lexbuf file)) with (_, v) -> v)
+let front_end file = (match (parse (init_lexbuf file)) with (_, v) -> v) |> Past_to_blocks.convert |> Blocks_to_untyped_ast.convert |> Untyped_ast_to_typed_ast.convert

@@ -1,1 +1,1 @@
-val front_end : string -> Ast.program
+val front_end : string -> Typed_ast.program
