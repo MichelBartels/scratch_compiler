@@ -56,7 +56,7 @@ let rec interp_expr program args expr =
                 | (Some (NumberValue v1), Some (NumberValue v2), Lt) -> Some (Scratch_value.BoolValue (v1 < v2))
                 | (Some v1, Some v2, Equals) -> Some (Scratch_value.BoolValue (v1 = v2))
                 | (Some (NumberValue v1), Some (NumberValue v2), Subtract) -> Some (Scratch_value.NumberValue (v1 -. v2))
-                | (Some (NumberValue v1), Some (NumberValue v2), Add) -> Some (Scratch_value.NumberValue (v1 -. v2))
+                | (Some (NumberValue v1), Some (NumberValue v2), Add) -> Some (Scratch_value.NumberValue (v1 +. v2))
                 | (Some (BoolValue v1), Some (BoolValue v2), Or) -> Some (BoolValue (v1 || v2))
                 | (Some (StringValue v1), Some (StringValue v2), Join) -> Some (StringValue (v1 ^ v2))
                 | (Some (NumberValue v1), Some (StringValue v2), LetterOf) -> Some (StringValue (String.make 1 v2.[int_of_float v1]))
