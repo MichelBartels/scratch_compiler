@@ -20,40 +20,6 @@ end = struct
     let empty = []
 end
 
-type scratch_type =
-    | Boolean
-    | Float
-    | String
-[@@ deriving show]
-
-let list_to_string l = List.fold_right (fun x y -> x ^ y) l ""
-
-let rec cast_scratch_value t v = match v with
-    | Untyped_ast.NumberValue n -> (match t with
-        | Boolean -> failwith "cannot cast to boolean"
-        | Float -> Untyped_ast.NumberValue n
-        | String -> StringValue (string_of_float n)
-    )
-    | BoolValue b -> (match t with
-        | Boolean -> BoolValue b
-        | Float -> NumberValue (if b then 1. else 0.)
-        | String -> StringValue (if b then "true" else "false")
-    )
-    | StringValue str -> (match t with
-        | Boolean -> failwith "cannot cast to boolean"
-        | Float -> NumberValue (match float_of_string_opt str with
-            | Some n -> n
-            | None -> 0.
-        )
-        | String -> StringValue str
-    )
-    | ListValue l -> (let str = List.map (cast_scratch_value t) l |> List.map (fun x -> match x with Untyped_ast.StringValue str -> str | _ -> failwith "invalid output") |> list_to_string in match t with
-        | Boolean -> failwith "cannot cast to boolean"
-        | Float -> NumberValue (match float_of_string_opt str with
-            | Some f -> f
-            | None -> 0.
-        )
-        | String -> StringValue str)
 
 (*type float_float_binary_op =
     | Add
@@ -86,9 +52,9 @@ type _ expr =
     | FuncCall: string * (string * *)
 
 type expr =
-    | Argument of string * scratch_type
-    | Variable of string * scratch_type
-    | Literal of Untyped_ast.scratch_value
+    | Argument of string * Scratch_type.t
+    | Variable of string * Scratch_type.t
+    | Literal of Scratch_value.t
     | BinaryOperator of Untyped_ast.binary_operator * expr * expr
     | Not of expr
     | FuncCall of string * (string * expr) list
@@ -96,7 +62,7 @@ type expr =
     | SetVariable of string * expr
     | AddToList of string * expr
     | DeleteAllOfList of string
-    | Index of string * expr * scratch_type
+    | Index of string * expr * Scratch_type.t
     | IncrVariable of string * expr
     | IndexOf of string * expr
     | SetIndex of string * expr * expr
@@ -106,20 +72,13 @@ type expr =
     | Say of expr
     | Ask of expr
     | Answer
-    | Cast of expr * scratch_type
+    | Cast of expr * Scratch_type.t
 [@@ deriving show]
-
-let scratch_type_of_scratch_value = Untyped_ast.(function
-    | NumberValue _ -> Float
-    | BoolValue _ -> Boolean
-    | StringValue _ -> String
-    | ListValue _ -> String
-)
 
 let get_type = function
     | Argument (_, t) -> Some t
     | Variable (_, t) -> Some t
-    | Literal l -> Some (scratch_type_of_scratch_value l)
+    | Literal l -> Some (Scratch_value.get_type l)
     | BinaryOperator (Gt, _, _) -> Some Boolean
     | BinaryOperator (Lt, _, _) -> Some Boolean
     | BinaryOperator (Subtract, _, _) -> Some Float
@@ -148,15 +107,15 @@ let get_type = function
 
 
 type scratch_function = {
-    parameters: (string * scratch_type) list;
+    parameters: (string * Scratch_type.t) list;
     statements: expr list
 }
 [@@ deriving show]
 
 type program = {
     functions: (string * scratch_function) list;
-    variables: (string * Untyped_ast.scratch_value) list;
-    lists: (string * Untyped_ast.scratch_value) list;
+    variables: (string * Scratch_value.t) list;
+    lists: (string * Scratch_value.t) list;
     main: expr list
 }
 [@@ deriving show]

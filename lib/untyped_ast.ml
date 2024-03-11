@@ -1,10 +1,3 @@
-type scratch_value =
-    | NumberValue of float
-    | BoolValue of bool
-    | StringValue of string
-    | ListValue of scratch_value list
-[@@ deriving show]
-
 type binary_operator =
     | Gt
     | Lt
@@ -19,7 +12,7 @@ type binary_operator =
 type expr =
     | Argument of string
     | Variable of string
-    | Literal of scratch_value
+    | Literal of Scratch_value.t
     | BinaryOperator of binary_operator * expr * expr
     | Not of expr
     | FuncCall of string * (string * expr) list
@@ -51,8 +44,8 @@ type function_ = {
 
 type program = {
     functions: (string * function_) list;
-    variables: (string * scratch_value) list;
-    lists: (string * scratch_value) list;
+    variables: (string * Scratch_value.t) list;
+    lists: (string * Scratch_value.t) list;
     main: expr list;
 }
 [@@ deriving show]

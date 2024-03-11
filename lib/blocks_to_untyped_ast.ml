@@ -67,9 +67,9 @@ and exprs_of_string_opt program id =
         | SetVariable set -> (SetVariable (get_variable_name_by_id set.variable, expr_of_input set.value ) :: (exprs_of_string_opt set.next))
         | AddToList add -> (AddToList (get_list_name_by_id add.list, expr_of_input add.item) :: (exprs_of_string_opt add.next))
         | DeleteAllOfList del -> (DeleteAllOfList (get_list_name_by_id del.list)) :: (exprs_of_string_opt del.next)
-        | NumOfList num -> [Index (get_list_name_by_id num.list, expr_of_input num.index)]
+        | NumOfList num -> [IndexOf (get_list_name_by_id num.list, expr_of_input num.item)]
         | ChangeVariableBy c -> (IncrVariable (get_variable_name_by_id c.variable, expr_of_input c.value)) :: (exprs_of_string_opt c.next)
-        | ItemOfList i -> [IndexOf (get_list_name_by_id i.list, expr_of_input i.item)]
+        | ItemOfList i -> [Index (get_list_name_by_id i.list, expr_of_input i.index)]
         | ReplaceItemOfList r -> (SetIndex {
             list = get_list_name_by_id r.list;
             index = expr_of_input r.index;

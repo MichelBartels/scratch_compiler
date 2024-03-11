@@ -4,7 +4,7 @@ type inferred_type =
     | Argument of string * string
     | Variable of string
     | ListElement of string
-    | Type of scratch_type
+    | Type of Scratch_type.t
     | Statement
 
 let output_type ?function_name = function
@@ -13,7 +13,7 @@ let output_type ?function_name = function
         | None -> failwith @@ "arguments can only be inside functions: " ^ a
     )
     | Variable v -> Variable v
-    | Literal l -> Type (scratch_type_of_scratch_value l)
+    | Literal l -> Type (Scratch_value.get_type l)
     | BinaryOperator (op, _, _) -> Type (match op with
         | Gt -> Boolean
         | Lt -> Boolean
@@ -111,11 +111,11 @@ type inferred_types = {
 
 let infer_types_for_default_values program = {
     variable_types = List.map (
-        fun (k, v) -> (k, Set.from_list [Type (scratch_type_of_scratch_value v)])
+        fun (k, v) -> (k, Set.from_list [Type (Scratch_value.get_type v)])
     ) program.Untyped_ast.variables;
     argument_types = [];
     list_types = List.map (function
-        | (k, Untyped_ast.ListValue xs) -> (k, List.map (fun x -> Type (scratch_type_of_scratch_value x)) xs |> Set.from_list)
+        | (k, Scratch_value.ListValue xs) -> (k, List.map (fun x -> Type (Scratch_value.get_type x)) xs |> Set.from_list)
         | _ -> failwith "list values need to be of type list"
     ) program.lists
 }
@@ -172,7 +172,7 @@ let unify_lists = unify_group (fun x -> x.list_types) (fun x -> ListElement x)
 
 let types program = program |> infer_types |> unify_variables |> unify_arguments |> unify_lists
 
-let reduce_to_single_type t = if Set.contains (Type String) t then String else if Set.contains (Type Float) t then Float else Boolean
+let reduce_to_single_type t = if Set.contains (Type String) t then Scratch_type.String else if Set.contains (Type Float) t then Float else Boolean
 
 let cast t e =
     let t' = match get_type e with Some t' -> t' | None -> failwith "cannot cast a statement into another type"
@@ -233,9 +233,9 @@ and bin_op_input_type ?funname types e1 e2 = function
     | Join -> (String, String)
     | LetterOf -> (Float, String)
 
-let convert_variable types (n, v) = (n, cast_scratch_value (var_type types n) v)
-let convert_lists types (n, v) = (n, Untyped_ast.ListValue (match v with
-    | Untyped_ast.ListValue l -> List.map (cast_scratch_value (list_type types n)) l
+let convert_variable types (n, v) = (n, Scratch_value.cast (var_type types n) v)
+let convert_lists types (n, v) = (n, Scratch_value.ListValue (match v with
+    | Scratch_value.ListValue l -> List.map (Scratch_value.cast (list_type types n)) l
     | _ -> failwith "cannot cast to list"
 ))
 let convert_function types (n, f) = (n, {

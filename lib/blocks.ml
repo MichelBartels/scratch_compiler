@@ -1,14 +1,14 @@
 type variable = {
     id: string;
     name: string;
-    value: Untyped_ast.scratch_value;
+    value: Scratch_value.t;
 }
 [@@ deriving show]
 
 type input =
     | Id of string
     | Variable of string
-    | Value of Untyped_ast.scratch_value
+    | Value of Scratch_value.t
 [@@ deriving show]
 
 type block =
@@ -73,7 +73,7 @@ type block =
     | NumOfList of {
         id: string;
         list: string;
-        index: input;
+        item: input;
     }
     | ChangeVariableBy of {
         id: string;
@@ -84,7 +84,7 @@ type block =
     | ItemOfList of {
         id: string;
         list: string;
-        item: input
+        index: input
     }
     | ReplaceItemOfList of {
         id: string;

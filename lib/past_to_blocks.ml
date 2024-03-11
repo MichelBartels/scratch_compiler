@@ -25,7 +25,7 @@ module Extractor (Ex: Extractor) = struct
     let extract t = get_targets t |> extract_uncoverted |> List.map Ex.convert
 end
 
-let create_value = Untyped_ast.(function
+let create_value = Scratch_value.(function
     | Past.Number (_, value) -> NumberValue value
     | Past.String (_, value) -> (match float_of_string_opt value with
         | Some f -> NumberValue f
@@ -51,7 +51,7 @@ module ListExtractor = Extractor(struct
         | (id, Past.Array (_, [Past.String(_, name); Past.Array(_, vals)])) -> {
             id = id;
             name = name;
-            value = Untyped_ast.ListValue (List.map create_value vals)
+            value = Scratch_value.ListValue (List.map create_value vals)
         }
         | _ -> failwith "invalid list format"
     let key = "lists"
@@ -208,7 +208,7 @@ let general_block_to_block {id; opcode; next; inputs; proccode; fields; value} =
         | "data_itemnumoflist" -> NumOfList {
             id = id;
             list = (match Assoc_list.search "LIST" fields with Some (_::list::_) -> list | _ -> failwith "missing LIST field");
-            index = (match Assoc_list.search "ITEM" inputs with Some item -> item | None -> failwith "missing ITEM for list");
+            item = (match Assoc_list.search "ITEM" inputs with Some item -> item | None -> failwith "missing ITEM for list");
         }
         | "data_changevariableby" -> ChangeVariableBy {
             id = id;
@@ -219,7 +219,7 @@ let general_block_to_block {id; opcode; next; inputs; proccode; fields; value} =
         | "data_itemoflist" -> ItemOfList {
             id = id;
             list = (match Assoc_list.search "LIST" fields with Some (_::list::_) -> list | _ -> failwith "missing LIST field");
-            item = (match Assoc_list.search "INDEX" inputs with Some value -> value | None -> failwith "missing index");
+            index = (match Assoc_list.search "INDEX" inputs with Some value -> value | None -> failwith "missing index");
         }
         | "data_replaceitemoflist" -> ReplaceItemOfList {
             id = id;
