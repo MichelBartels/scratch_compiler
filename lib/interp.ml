@@ -99,7 +99,7 @@ let rec interp_expr program args expr =
             let list = Assoc_list.search k state.lists |> assert_some |> assert_list in
             {
                 variables = state.variables;
-                lists = Assoc_list.update k (Scratch_value.ListValue (v::list)) state.lists;
+                lists = Assoc_list.update k (Scratch_value.ListValue (list @ [v])) state.lists;
                 answer = state.answer;
             }
         ))
@@ -112,7 +112,7 @@ let rec interp_expr program args expr =
     | Index (k, i, t) ->
         let+ i = interp_expr_local i in
         let i = i |> assert_some |> assert_number in
-        let i = int_of_float i + 1 in
+        let i = int_of_float i - 1 in
         (fun state ->
             let list = Assoc_list.search k state.lists |> assert_some |> assert_list in
             ((match List.nth_opt list i with Some v -> Some v | None -> Some (Scratch_value.default t)), state)
@@ -145,7 +145,7 @@ let rec interp_expr program args expr =
         let v = v |> assert_some in
         (fun state ->
             let list = Assoc_list.search l state.lists |> assert_some |> assert_list in
-            let list = List.mapi (fun i' x -> if (float_of_int i') = (i +. 1.) then v else x) list in 
+            let list = List.mapi (fun i' x -> if (float_of_int i') = (i -. 1.) then v else x) list in 
             (None, {
                 variables = state.variables;
                 lists = Assoc_list.update l (Scratch_value.ListValue list) state.lists;

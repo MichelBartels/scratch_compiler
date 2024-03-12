@@ -196,11 +196,11 @@ let rec convert_expr ?funname types e =
         | Variable var -> Variable (var, var_type var)
         | Literal v -> Literal v
         | BinaryOperator (op, e1, e2) -> let (t1, t2) = bin_op_input_type ?funname types e1 e2 op in BinaryOperator (op, convert e1 |> cast t1, convert e2 |> cast t2)
-        | Not e -> convert e |> cast Boolean
+        | Not e -> Not(convert e |> cast Boolean)
         | FuncCall (name, es) -> FuncCall (name, List.map (fun (k, v) -> (k, convert v |> cast (arg_type (name, k)))) es)
         | Branch (cond, then_branch, else_branch) -> Branch (convert cond |> cast Boolean, List.map convert then_branch, List.map convert else_branch)
         | SetVariable (name, e) -> SetVariable (name, convert e |> cast (var_type name))
-        | AddToList (name, e) -> AddToList (name, convert e)
+        | AddToList (name, e) -> AddToList (name, convert e |> cast (list_type name))
         | DeleteAllOfList name -> DeleteAllOfList name
         | Index (name, i) -> Index (name, convert i |> cast Float, list_type name)
         | IncrVariable (name, e) -> IncrVariable (name, convert e |> cast Float)

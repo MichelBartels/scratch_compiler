@@ -13,7 +13,9 @@ let rec cast t v = match v with
     | NumberValue n -> (match t with
         | Boolean -> failwith "cannot cast to boolean"
         | Float -> NumberValue n
-        | String -> StringValue (string_of_float n)
+        | String -> StringValue (match modf n with
+            | (0., _) -> string_of_int (int_of_float n)
+            | _ -> string_of_float n)
     )
     | BoolValue b -> (match t with
         | Boolean -> BoolValue b
