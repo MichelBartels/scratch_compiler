@@ -9,6 +9,7 @@ module Function = struct
     type t = {
         parameters: (string * Llvm.llvalue) list;
         f: Llvm.llvalue;
+        entry: Llvm.llbasicblock;
         ty: Llvm.lltype;
     }
     let declare name scratch_function =
@@ -20,7 +21,8 @@ module Function = struct
         let parameters = List.map2 (fun (name, _) param ->
             (name, param)
         ) scratch_function.parameters (Array.to_list (Llvm.params f)) in
-        { parameters; f; ty }
+        let entry = Llvm.append_block context "" f in
+        { parameters; f; ty; entry }
     let param name f =
         List.assoc name f.parameters
     let call f args =
@@ -106,3 +108,21 @@ let rec convert_expr cur_fn vars funcs e =
         Llvm.build_store value var builder
     | _ -> failwith "unsupported instruction"
     )
+
+let convert_function scratch_f f =
+    Llvm.position_at_end f builder;
+    convert_expr scratch_f
+
+type program = {
+    vars: (string * Llvm.llvalue) list;
+    functions: Function.t list;
+}
+
+let convert (p: Typed_ast.program) =
+    let vars = init_variables p.variables in
+    let functions = List.map (fun (k, f) -> Function.declare k f) p.functions in
+    ignore @@ List.map2 (fun (_, scratch_f) f ->
+        Llvm.position_at_end f.entry builder;
+        ignore @@ List.map (convert_expr f vars functions) scratch_f
+    ) p.functions functions;
+    
