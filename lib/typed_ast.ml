@@ -26,15 +26,15 @@ let get_type = function
     | Argument (_, t) -> Some t
     | Variable (_, t) -> Some t
     | Literal l -> Some (Scratch_value.get_type l)
-    | BinaryOperator (Gt, _, _) -> Some Boolean
-    | BinaryOperator (Lt, _, _) -> Some Boolean
-    | BinaryOperator (Subtract, _, _) -> Some Float
-    | BinaryOperator (Add, _, _) -> Some Float
-    | BinaryOperator (Equals, _, _) -> Some Boolean
-    | BinaryOperator (Or, _, _) -> Some Boolean
-    | BinaryOperator (Join, _, _) -> Some String
-    | BinaryOperator (LetterOf, _, _) -> Some String
-    | Not _ -> Some Boolean
+    | BinaryOperator (Gt, _, _) -> Some (Primitive Boolean)
+    | BinaryOperator (Lt, _, _) -> Some (Primitive Boolean)
+    | BinaryOperator (Subtract, _, _) -> Some (Primitive Float)
+    | BinaryOperator (Add, _, _) -> Some (Primitive Float)
+    | BinaryOperator (Equals, _, _) -> Some (Primitive Boolean)
+    | BinaryOperator (Or, _, _) -> Some (Primitive Boolean)
+    | BinaryOperator (Join, _, _) -> Some (Primitive String)
+    | BinaryOperator (LetterOf, _, _) -> Some (Primitive String)
+    | Not _ -> Some (Primitive Boolean)
     | FuncCall _ -> None
     | Branch _ -> None
     | SetVariable _ -> None
@@ -42,14 +42,14 @@ let get_type = function
     | DeleteAllOfList _ -> None
     | Index (_, _, t) -> Some t
     | IncrVariable _ -> None
-    | IndexOf _ -> Some Float
+    | IndexOf _ -> Some (Primitive Float)
     | SetIndex _ -> None
-    | Length _ -> Some Float
+    | Length _ -> Some (Primitive Float)
     | WhileNot _ -> None
     | Repeat _ -> None
     | Say _ -> None
     | Ask _ -> None
-    | Answer -> Some String
+    | Answer -> Some (Primitive String)
     | Cast (_, t) -> Some t
 
 

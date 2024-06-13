@@ -31,10 +31,10 @@ module State: Monad with type 'a t = state -> 'a * state = struct
 end
 
 let assert_some = function | Some s -> s | None -> failwith "unexpected statement; this should have been detected during type inference"
-let assert_number = function | Scratch_value.NumberValue n -> n | _ -> failwith "not number; this should have been detected during type inference"
-let assert_bool = function | Scratch_value.BoolValue n -> n | _ -> failwith "not bool; this should have been detected during type inference"
-let assert_string = function | Scratch_value.StringValue str -> str | _ -> failwith "not string; this should have been detected during type inference"
-let assert_list = function | Scratch_value.ListValue l -> l | _ -> failwith "not list; this should have been detected during type inference"
+let assert_number = function | Scratch_value.Primitive (Float n) -> n | _ -> failwith "not number; this should have been detected during type inference"
+let assert_bool = function | Scratch_value.Primitive (Float n) -> n | _ -> failwith "not bool; this should have been detected during type inference"
+let assert_string = function | Scratch_value.Primitive (String str) -> str | _ -> failwith "not string; this should have been detected during type inference"
+let assert_list = function | Scratch_value.List l -> l | _ -> failwith "not list; this should have been detected during type inference"
 
 
 let rec interp_expr program args expr =
@@ -52,14 +52,14 @@ let rec interp_expr program args expr =
             let+ v1 = interp_expr_local e1
             and+ v2 = interp_expr_local e2
             in (return @@ match (v1, v2, op) with
-                | (Some (NumberValue v1), Some (NumberValue v2), Gt) -> Some (Scratch_value.BoolValue (v1 > v2))
-                | (Some (NumberValue v1), Some (NumberValue v2), Lt) -> Some (Scratch_value.BoolValue (v1 < v2))
-                | (Some v1, Some v2, Equals) -> Some (Scratch_value.BoolValue (v1 = v2))
-                | (Some (NumberValue v1), Some (NumberValue v2), Subtract) -> Some (Scratch_value.NumberValue (v1 -. v2))
-                | (Some (NumberValue v1), Some (NumberValue v2), Add) -> Some (Scratch_value.NumberValue (v1 +. v2))
-                | (Some (BoolValue v1), Some (BoolValue v2), Or) -> Some (BoolValue (v1 || v2))
-                | (Some (StringValue v1), Some (StringValue v2), Join) -> Some (StringValue (v1 ^ v2))
-                | (Some (NumberValue v1), Some (StringValue v2), LetterOf) -> Some (StringValue (String.make 1 v2.[int_of_float v1]))
+                | (Some (Primitive Float v1), Some (Primitive Float v2), Gt) -> Some (Scratch_value.Primitive (Boolean (v1 > v2)))
+                | (Some (Primitive Float v1), Some (Primitive Float v2), Lt) -> Some (Primitive (Boolean (v1 < v2)))
+                | (Some v1, Some v2, Equals) -> Some (Primitive (Boolean (v1 = v2)))
+                | (Some (Primitive Float v1), Some (Primitive Float v2), Subtract) -> Some (Primitive (Float (v1 -. v2)))
+                | (Some (Primitive Float v1), Some (Primitive Float v2), Add) -> Some (Primitive (Float (v1 +. v2)))
+                | (Some (Primitive Boolean v1), Some (Primitive Boolean v2), Or) -> Some (Primitive (Boolean (v1 || v2)))
+                | (Some (Primitive String v1), Some (Primitive String v2), Join) -> Some (Primitive (String (v1 ^ v2)))
+                | (Some (Primitive Float v1), Some (Primitive String v2), LetterOf) -> Some (Primitive (String (String.make 1 v2.[int_of_float v1])))
                 | (_, _, op) -> failwith @@ "invalid input for binary op: " ^ Untyped_ast.show_binary_operator op
             )
     | Not e ->

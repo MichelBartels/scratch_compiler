@@ -47,18 +47,22 @@ end
 let alloc_string = RuntimeFunction.declare "alloc_string" [Llvm.i64_type context] (Llvm.pointer_type context)
 (*let alloc_empty_vec = RuntimeFunction.declare "alloc_empty_vec" [] (Llvm.pointer_type context)*)
 
+let say = RuntimeFunction.declare "say" [Llvm.pointer_type context] (Llvm.void_type context)
+
+let cast_double_to_string = RuntimeFunction.declare "cast_f64_to_string" [Llvm.double_type context] (Llvm.pointer_type context)
+
 let create_literal = function
-    | Scratch_value.NumberValue n -> Llvm.const_float (Llvm.double_type context) n
-    | BoolValue b -> Llvm.const_int (Llvm.i1_type context) (if b then 1 else 0)
-    | StringValue s -> Llvm.const_stringz context s
-    | ListValue _ -> failwith "Lists have a separate scope"
+    | Scratch_value.Primitive (Float n) -> Llvm.const_float (Llvm.double_type context) n
+    | Primitive (Boolean b) -> Llvm.const_int (Llvm.i1_type context) (if b then 1 else 0)
+    | Primitive (String s) -> Llvm.const_stringz context s
+    | List _ -> failwith "Lists have a separate scope"
 
 let init_variable name var =
     let scratch_type = Scratch_value.get_type var in
     let lltype = Scratch_type.to_lltype scratch_type context in
     let global = Llvm.declare_global lltype name llmodule in
     Llvm.set_initializer (create_literal var) global;
-    global
+    (lltype, global)
 
 let init_variables vars =
     List.map (fun (name, var) -> (name, init_variable name var)) vars
@@ -66,7 +70,7 @@ let init_variables vars =
 let rec convert_expr cur_fn vars funcs e =
     let convert_expr = convert_expr cur_fn vars funcs in (match e with
     | Argument (name, _) -> Function.param name cur_fn
-    | Variable (name, _) -> List.assoc name vars
+    | Variable (name, _) -> let (lltype, var) = List.assoc name vars in Llvm.build_load lltype var "" builder
     | Literal lit -> create_literal lit
     | BinaryOperator (op, e1, e2) ->
         let e1 = convert_expr e1 in
@@ -100,13 +104,18 @@ let rec convert_expr cur_fn vars funcs e =
         Llvm.position_at_end else_block builder;
         ignore @@ List.map convert_expr else_branch;
         ignore @@ Llvm.build_br next_block builder;
-        Llvm.position_at_end then_block builder;
+        Llvm.position_at_end next_block builder;
         branch
     | SetVariable (var, e) ->
         let value = convert_expr e in
-        let var = List.assoc var vars in
+        let (_, var) = List.assoc var vars in
         Llvm.build_store value var builder
-    | _ -> failwith "unsupported instruction"
+    | Say e -> RuntimeFunction.call say [convert_expr e]
+    | Cast (e, to_type) -> (let from_type = Typed_ast.get_type e in match (from_type, to_type) with
+        | (Some Primitive Float, Primitive String) -> RuntimeFunction.call cast_double_to_string [convert_expr e]
+        | _ -> failwith "Unsupported cast"
+    )
+    | _ -> failwith "Unsupported expression"
     )
 
 let convert_function scratch_f f =
@@ -114,15 +123,21 @@ let convert_function scratch_f f =
     convert_expr scratch_f
 
 type program = {
-    vars: (string * Llvm.llvalue) list;
-    functions: Function.t list;
+    vars: (string * (Llvm.lltype * Llvm.llvalue)) list;
+    functions: (string * Function.t) list;
 }
 
 let convert (p: Typed_ast.program) =
     let vars = init_variables p.variables in
-    let functions = List.map (fun (k, f) -> Function.declare k f) p.functions in
-    ignore @@ List.map2 (fun (_, scratch_f) f ->
-        Llvm.position_at_end f.entry builder;
-        ignore @@ List.map (convert_expr f vars functions) scratch_f
+    let functions = List.map (fun (k, f) -> (k, Function.declare k f)) p.functions in
+    ignore @@ List.map2 (fun (_, scratch_f) (_, f) ->
+        Llvm.position_at_end f.Function.entry builder;
+        ignore @@ List.map (convert_expr f vars functions) scratch_f.statements;
+        Llvm.build_ret_void builder
     ) p.functions functions;
-    
+    let main = Llvm.declare_function "main" (Llvm.function_type (Llvm.void_type context) [||]) llmodule in
+    let main_entry = Llvm.append_block context "" main in
+    Llvm.position_at_end main_entry builder;
+    ignore @@ List.map (convert_expr { parameters = []; f = main; entry = main_entry; ty = Llvm.void_type context } vars functions) p.main;
+    ignore @@ Llvm.build_ret_void builder;
+    { vars; functions }

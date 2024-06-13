@@ -4,7 +4,7 @@ type inferred_type =
     | Argument of string * string
     | Variable of string
     | ListElement of string
-    | Type of Scratch_type.t
+    | Type of Scratch_type.primitive_type
     | Statement
 
 let output_type ?function_name = function
@@ -13,7 +13,7 @@ let output_type ?function_name = function
         | None -> failwith @@ "arguments can only be inside functions: " ^ a
     )
     | Variable v -> Variable v
-    | Literal l -> Type (Scratch_value.get_type l)
+    | Literal l -> Type (match l with Primitive l -> Scratch_value.get_primitive_type l | List _ -> failwith "lists are not literals")
     | BinaryOperator (op, _, _) -> Type (match op with
         | Gt -> Boolean
         | Lt -> Boolean
@@ -106,16 +106,16 @@ let find_lists e = tree_map (function
 type inferred_types = {
     variable_types: (string * inferred_type Set.t) list;
     argument_types: ((string * string) * inferred_type Set.t) list;
-    list_types: (string * inferred_type Set.t) list;
+    list_types: (string * inferred_type) list;
 }
 
 let infer_types_for_default_values program = {
     variable_types = List.map (
-        fun (k, v) -> (k, Set.from_list [Type (Scratch_value.get_type v)])
+        function (k, Scratch_value.Primitive v) -> (k, Set.from_list [Type (Scratch_value.get_primitive_type v)]) | _ -> failwith "non-primitive values in variables"
     ) program.Untyped_ast.variables;
     argument_types = [];
     list_types = List.map (function
-        | (k, Scratch_value.ListValue xs) -> (k, List.map (fun x -> Type (Scratch_value.get_type x)) xs |> Set.from_list)
+        | (k, Scratch_value.List xs) -> (k, Type (Scratch_value.get_primitive_list_type xs))
         | _ -> failwith "list values need to be of type list"
     ) program.lists
 }
