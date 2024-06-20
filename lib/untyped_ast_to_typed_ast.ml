@@ -7,6 +7,16 @@ type inferred_type =
     | Type of Scratch_type.primitive_type
     | Statement
 
+module InferredTypeSet = Set.Make(struct
+    type t = inferred_type
+    let compare = compare
+end)
+module StringSet = Set.Make(String)
+module ArgSet = Set.Make(struct
+    type t = string * string
+    let compare = compare
+end)
+
 let output_type ?function_name = function
     | Untyped_ast.Argument a -> Argument (a, match function_name with
         | Some name -> name
@@ -71,51 +81,51 @@ let infer_var_type ?function_name v e = tree_map (function
     | SetVariable (v', e) when v' = v -> [output_type ?function_name e]
     | IncrVariable (v', _) when v' = v -> [Type Float]
     | _ -> []
-) e |> Set.from_list
+) e |> InferredTypeSet.of_list
 
 let find_vars e = tree_map (function
     | SetVariable (v, _) -> [v]
     | IncrVariable (v, _) -> [v]
     | _ -> []
-) e |> Set.from_list |> Set.to_list
+) e |> StringSet.of_list |> StringSet.to_list
 
 let infer_arg_type ?function_name arg_fn arg_name e = tree_map (function
     | FuncCall (fn, args) when fn = arg_fn -> (match Assoc_list.search arg_name args with 
         | Some e -> [output_type ?function_name e]
         | None -> failwith "function missing argument")
     | _ -> []
-) e |> Set.from_list
+) e |> InferredTypeSet.of_list
 
 let find_args e = tree_map (function
     | FuncCall (name, args) -> List.map (fun (arg, _) -> (name, arg)) args
     | _ -> []
-) e |> Set.from_list |> Set.to_list
+) e |> ArgSet.of_list |> ArgSet.to_list
 
 let infer_list_type ?function_name l e = tree_map (function
     | AddToList (l', e) when l' = l -> [output_type ?function_name e]
     | SetIndex s when s.list = l -> [output_type ?function_name s.value]
     | _ -> []
-) e |> Set.from_list
+) e |> InferredTypeSet.of_list
 
 let find_lists e = tree_map (function
     | AddToList (l, _) -> [l]
     | SetIndex s -> [s.list]
     | _ -> []
-) e |> Set.from_list |> Set.to_list
+) e |> StringSet.of_list |> StringSet.to_list
 
 type inferred_types = {
-    variable_types: (string * inferred_type Set.t) list;
-    argument_types: ((string * string) * inferred_type Set.t) list;
-    list_types: (string * inferred_type) list;
+    variable_types: (string * InferredTypeSet.t) list;
+    argument_types: ((string * string) * InferredTypeSet.t) list;
+    list_types: (string * InferredTypeSet.t) list;
 }
 
 let infer_types_for_default_values program = {
     variable_types = List.map (
-        function (k, Scratch_value.Primitive v) -> (k, Set.from_list [Type (Scratch_value.get_primitive_type v)]) | _ -> failwith "non-primitive values in variables"
+        function (k, Scratch_value.Primitive v) -> (k, InferredTypeSet.of_list [Type (Scratch_value.get_primitive_type v)]) | _ -> failwith "non-primitive values in variables"
     ) program.Untyped_ast.variables;
     argument_types = [];
     list_types = List.map (function
-        | (k, Scratch_value.List xs) -> (k, Type (Scratch_value.get_primitive_list_type xs))
+        | (k, Scratch_value.List xs) -> (k, InferredTypeSet.singleton (Type (Scratch_value.get_primitive_list_type xs)))
         | _ -> failwith "list values need to be of type list"
     ) program.lists
 }
@@ -127,7 +137,7 @@ let infer_types_for_expr ?function_name e = {
 }
 
 let merge_set_assoc_list d1 d2 = 
-    List.map (fun (k, v) -> (k, Set.union [(match Assoc_list.search k d2 with Some s -> s | None -> Set.empty); v])) d1
+    List.map (fun (k, v) -> (k, InferredTypeSet.union (match Assoc_list.search k d2 with Some s -> s | None -> InferredTypeSet.empty) v)) d1
     @ List.filter (fun (k, _) -> not @@ List.exists (fun (k', _) -> k = k') d1) d2
 
 let merge_inferred_types t1 t2 = {
@@ -149,9 +159,9 @@ let infer_types program =
     in merge_inferred_types_list inferred_types
 
 let unify_types (k, types) cons = List.map (
-                    fun (k', other_types) -> (k', if Set.contains (cons k) other_types
-                    then let other_types = Set.remove (cons k) other_types
-                    in Set.union [types; other_types]
+                    fun (k', other_types) -> (k', if InferredTypeSet.mem (cons k) other_types
+                    then let other_types = InferredTypeSet.remove (cons k) other_types
+                    in InferredTypeSet.union types other_types
                     else other_types))
 
 let unify_group selector cons types =
@@ -172,7 +182,7 @@ let unify_lists = unify_group (fun x -> x.list_types) (fun x -> ListElement x)
 
 let types program = program |> infer_types |> unify_variables |> unify_arguments |> unify_lists
 
-let reduce_to_single_type t = if Set.contains (Type String) t then Scratch_type.String else if Set.contains (Type Float) t then Float else Boolean
+let reduce_to_single_type t = if InferredTypeSet.mem (Type String) t then Scratch_type.String else if InferredTypeSet.mem (Type Float) t then Float else Boolean
 
 let cast t e =
     let t' = match get_type e with Some t' -> t' | None -> failwith "cannot cast a statement into another type"
@@ -192,54 +202,54 @@ let rec convert_expr ?funname types e =
     in match e with
         | Untyped_ast.Argument arg -> (
             let funname = match funname with Some f -> f | None -> failwith "arg outside function"
-            in Typed_ast.Argument (arg, arg_type (funname, arg)))
-        | Variable var -> Variable (var, var_type var)
+            in Typed_ast.Argument (arg, Primitive (arg_type (funname, arg))))
+        | Variable var -> Variable (var, Primitive (var_type var))
         | Literal v -> Literal v
         | BinaryOperator (op, e1, e2) -> let (t1, t2) = bin_op_input_type ?funname types e1 e2 op in BinaryOperator (op, convert e1 |> cast t1, convert e2 |> cast t2)
-        | Not e -> Not(convert e |> cast Boolean)
-        | FuncCall (name, es) -> FuncCall (name, List.map (fun (k, v) -> (k, convert v |> cast (arg_type (name, k)))) es)
-        | Branch (cond, then_branch, else_branch) -> Branch (convert cond |> cast Boolean, List.map convert then_branch, List.map convert else_branch)
-        | SetVariable (name, e) -> SetVariable (name, convert e |> cast (var_type name))
-        | AddToList (name, e) -> AddToList (name, convert e |> cast (list_type name))
+        | Not e -> Not(convert e |> cast (Primitive Boolean))
+        | FuncCall (name, es) -> FuncCall (name, List.map (fun (k, v) -> (k, convert v |> cast (Primitive (arg_type (name, k))))) es)
+        | Branch (cond, then_branch, else_branch) -> Branch (convert cond |> cast (Primitive Boolean), List.map convert then_branch, List.map convert else_branch)
+        | SetVariable (name, e) -> SetVariable (name, convert e |> cast (Primitive (var_type name)))
+        | AddToList (name, e) -> AddToList (name, convert e |> cast (Primitive (list_type name)))
         | DeleteAllOfList name -> DeleteAllOfList name
-        | Index (name, i) -> Index (name, convert i |> cast Float, list_type name)
-        | IncrVariable (name, e) -> IncrVariable (name, convert e |> cast Float)
-        | IndexOf (name, e) -> IndexOf (name, convert e |> cast (list_type name))
-        | SetIndex s -> SetIndex (s.list, convert s.index |> cast Float, convert s.value |> cast (list_type s.list))
+        | Index (name, i) -> Index (name, convert i |> cast (Primitive Float), Primitive (list_type name))
+        | IncrVariable (name, e) -> IncrVariable (name, convert e |> cast (Primitive Float))
+        | IndexOf (name, e) -> IndexOf (name, convert e |> cast (Primitive (list_type name)))
+        | SetIndex s -> SetIndex (s.list, convert s.index |> cast (Primitive Float), convert s.value |> cast (Primitive (list_type s.list)))
         | Length l -> Length l
-        | WhileNot (cond, body) -> WhileNot (convert cond |> cast Boolean, List.map convert body)
-        | Repeat (cond, body) -> Repeat (convert cond |> cast Float, List.map convert body)
-        | Say message -> Say (convert message |> cast String)
-        | Ask question -> Ask (convert question |> cast String)
+        | WhileNot (cond, body) -> WhileNot (convert cond |> cast (Primitive Boolean), List.map convert body)
+        | Repeat (cond, body) -> Repeat (convert cond |> cast (Primitive Float), List.map convert body)
+        | Say message -> Say (convert message |> cast (Primitive String))
+        | Ask question -> Ask (convert question |> cast (Primitive String))
         | Answer -> Answer
 and bin_op_input_type ?funname types e1 e2 = function
-    | Untyped_ast.Gt -> (Float, Float)
-    | Lt -> (Float, Float)
-    | Subtract -> (Float, Float)
-    | Add -> (Float, Float)
+    | Untyped_ast.Gt -> (Primitive Float, Primitive Float)
+    | Lt -> (Primitive Float, Primitive Float)
+    | Subtract -> (Primitive Float, Primitive Float)
+    | Add -> (Primitive Float, Primitive Float)
     | Equals ->
             let e1 = convert_expr ?funname types e1
             in let e2 = convert_expr ?funname types e2
             in let t1 = match get_type e1 with Some t1 -> t1 | None -> failwith "cannot compare statements"
             in let t2 = match get_type e2 with Some t2 -> t2 | None -> failwith "cannot compare statements"
             in (match (t1, t2) with
-                | (String, _) -> (String, String)
-                | (_, String) -> (String, String)
-                | (Float, _) -> (Float, Float)
-                | (_, Float) -> (Float, Float)
-                | _ -> (Boolean, Boolean)
+                | (Primitive String, _) -> (Primitive String, Primitive String)
+                | (_, Primitive String) -> (Primitive String, Primitive String)
+                | (Primitive Float, _) -> (Primitive Float, Primitive Float)
+                | (_, Primitive Float) -> (Primitive Float, Primitive Float)
+                | _ -> (Primitive Boolean, Primitive Boolean)
             )
-    | Or -> (Boolean, Boolean)
-    | Join -> (String, String)
-    | LetterOf -> (Float, String)
+    | Or -> (Primitive Boolean, Primitive Boolean)
+    | Join -> (Primitive String, Primitive String)
+    | LetterOf -> (Primitive Float, Primitive String)
 
-let convert_variable types (n, v) = (n, Scratch_value.cast (var_type types n) v)
-let convert_lists types (n, v) = (n, Scratch_value.ListValue (match v with
-    | Scratch_value.ListValue l -> List.map (Scratch_value.cast (list_type types n)) l
+let convert_variable types (n, v) = (n, Scratch_value.Primitive (Scratch_value.cast (var_type types n) v))
+let convert_lists types (n, v) = (n, Scratch_value.List (match v with
+    | Scratch_value.List l -> List.map (fun x -> Scratch_value.Primitive x) l |> List.map (Scratch_value.cast (list_type types n))
     | _ -> failwith "cannot cast to list"
 ))
 let convert_function types (n, f) = (n, {
-    parameters = List.map (fun p -> (p, arg_type types (n, p))) f.Untyped_ast.parameters;
+    parameters = List.map (fun p -> (p, Scratch_type.Primitive (arg_type types (n, p)))) f.Untyped_ast.parameters;
     statements = List.map (convert_expr ~funname:n types) f.statements;
 })
 let convert program =

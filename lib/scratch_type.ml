@@ -29,3 +29,9 @@ let unify a b =
 
 let bottom_primitive = Boolean
 
+let assert_list = function
+    | List t -> t
+    | _ -> failwith "Expected list type"
+let assert_primitive = function
+    | Primitive t -> t
+    | _ -> failwith "Expected primitive type"

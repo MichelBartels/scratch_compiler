@@ -33,10 +33,20 @@ let cast_primitive_value t v = match v with
         | String -> String str
     )
 
-let cast t = function
-    | Primitive v -> Primitive (cast_primitive_value t v)
-    | List l -> List (List.map (cast_primitive_value t) l)
+let assert_number = function | Primitive (Float n) -> n | _ -> failwith "not number; this should have been detected during type inference"
+let assert_bool = function | Primitive (Boolean n) -> n | _ -> failwith "not bool; this should have been detected during type inference"
+let assert_string = function | Primitive (String str) -> str | _ -> failwith "not string; this should have been detected during type inference"
+let assert_list = function | List l -> l | _ -> failwith "not list; this should have been detected during type inference"
+let assert_primitive = function | Primitive p -> p | _ -> failwith "not primitive; this should have been detected during type inference"
 
+let cast t = function
+    | Primitive v -> cast_primitive_value t v
+    | List l -> let l = List.map (cast_primitive_value t) l in
+        (match t with
+            | Scratch_type.String -> String (list_to_string (List.map (function String str -> str | _ -> failwith "cast failed") l))
+            | Float -> Float (List.fold_left (+.) 0. (List.map (function Float f -> f | _ -> failwith "cast failed") l))
+            | Boolean -> failwith "cannot cast list to boolean"
+        )
 let get_primitive_type = function
     | Float _ -> Scratch_type.Float
     | Boolean _ -> Boolean
@@ -48,10 +58,12 @@ let get_type = function
     | Primitive v -> Scratch_type.Primitive (get_primitive_type v)
     | List vs -> Scratch_type.List (get_primitive_list_type vs)
 
+let default_primitive = function
+    | Scratch_type.Float -> Float 0.
+    | Scratch_type.Boolean -> Boolean false
+    | Scratch_type.String -> String ""
+
 let default = function
-    | Scratch_type.Primitive t -> Primitive (match t with
-        | Scratch_type.Float -> Float 0.
-        | Scratch_type.Boolean -> Boolean false
-        | Scratch_type.String -> String ""
-    )
+    | Scratch_type.Primitive t -> Primitive (default_primitive t)
     | Scratch_type.List _ -> List []
+
