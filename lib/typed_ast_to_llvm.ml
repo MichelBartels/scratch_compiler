@@ -44,17 +44,21 @@ module RuntimeFunction = struct
         Llvm.build_call f.ty f.f (Array.of_list args) "" builder
 end
 
-let alloc_string = RuntimeFunction.declare "alloc_string" [Llvm.i64_type context] (Llvm.pointer_type context)
+let alloc_string = RuntimeFunction.declare "alloc_string" [Llvm.pointer_type context] (Llvm.pointer_type context)
 (*let alloc_empty_vec = RuntimeFunction.declare "alloc_empty_vec" [] (Llvm.pointer_type context)*)
 
 let say = RuntimeFunction.declare "say" [Llvm.pointer_type context] (Llvm.void_type context)
+let ask = RuntimeFunction.declare "ask" [Llvm.pointer_type context; Llvm.pointer_type context] (Llvm.void_type context)
 
 let cast_double_to_string = RuntimeFunction.declare "cast_f64_to_string" [Llvm.double_type context] (Llvm.pointer_type context)
+let cast_string_to_double = RuntimeFunction.declare "cast_string_to_f64" [Llvm.pointer_type context] (Llvm.double_type context)
 
 let create_literal = function
     | Scratch_value.Primitive (Float n) -> Llvm.const_float (Llvm.double_type context) n
     | Primitive (Boolean b) -> Llvm.const_int (Llvm.i1_type context) (if b then 1 else 0)
-    | Primitive (String s) -> Llvm.const_stringz context s
+    | Primitive (String s) ->
+        let str = Llvm.build_global_stringptr s "" builder in
+        RuntimeFunction.call alloc_string [str]
     | List _ -> failwith "Lists have a separate scope"
 
 let init_variable name var =
@@ -64,11 +68,17 @@ let init_variable name var =
     Llvm.set_initializer (create_literal var) global;
     (lltype, global)
 
+let init_answer () =
+    let lltype = Llvm.pointer_type context in
+    let answer = Llvm.declare_global lltype "answer" llmodule in
+    Llvm.set_initializer (Llvm.const_pointer_null lltype) answer;
+    answer
+
 let init_variables vars =
     List.map (fun (name, var) -> (name, init_variable name var)) vars
 
-let rec convert_expr cur_fn vars funcs e =
-    let convert_expr = convert_expr cur_fn vars funcs in (match e with
+let rec convert_expr cur_fn vars funcs answer e =
+    let convert_expr = convert_expr cur_fn vars funcs answer in (match e with
     | Argument (name, _) -> Function.param name cur_fn
     | Variable (name, _) -> let (lltype, var) = List.assoc name vars in Llvm.build_load lltype var "" builder
     | Literal lit -> create_literal lit
@@ -113,8 +123,11 @@ let rec convert_expr cur_fn vars funcs e =
     | Say e -> RuntimeFunction.call say [convert_expr e]
     | Cast (e, to_type) -> (let from_type = Typed_ast.get_type e in match (from_type, to_type) with
         | (Some Primitive Float, Primitive String) -> RuntimeFunction.call cast_double_to_string [convert_expr e]
+        | (Some Primitive String, Primitive Float) -> RuntimeFunction.call cast_string_to_double [convert_expr e]
         | _ -> failwith "Unsupported cast"
     )
+    | Ask e -> let question = convert_expr e in RuntimeFunction.call ask [question; answer]
+    | Answer -> answer
     | _ -> failwith "Unsupported expression"
     )
 
@@ -129,15 +142,34 @@ type program = {
 
 let convert (p: Typed_ast.program) =
     let vars = init_variables p.variables in
+    let answer = init_answer () in
     let functions = List.map (fun (k, f) -> (k, Function.declare k f)) p.functions in
     ignore @@ List.map2 (fun (_, scratch_f) (_, f) ->
         Llvm.position_at_end f.Function.entry builder;
-        ignore @@ List.map (convert_expr f vars functions) scratch_f.statements;
+        ignore @@ List.map (convert_expr f vars functions answer) scratch_f.statements;
         Llvm.build_ret_void builder
     ) p.functions functions;
     let main = Llvm.declare_function "main" (Llvm.function_type (Llvm.void_type context) [||]) llmodule in
     let main_entry = Llvm.append_block context "" main in
     Llvm.position_at_end main_entry builder;
-    ignore @@ List.map (convert_expr { parameters = []; f = main; entry = main_entry; ty = Llvm.void_type context } vars functions) p.main;
+    ignore @@ List.map (convert_expr { parameters = []; f = main; entry = main_entry; ty = Llvm.void_type context } vars functions answer) p.main;
     ignore @@ Llvm.build_ret_void builder;
     { vars; functions }
+
+let aot_compile () =
+    Llvm_analysis.assert_valid_module llmodule;
+    Llvm_all_backends.initialize ();
+    let target_triple = Llvm_target.Target.default_triple () in
+    let target = Llvm_target.Target.by_triple target_triple in
+    let target_machine = Llvm_target.TargetMachine.create ~triple:target_triple target in
+    let target_data = Llvm_target.TargetMachine.data_layout target_machine |> Llvm_target.DataLayout.as_string in
+    Llvm.set_data_layout target_data llmodule;
+    Llvm.set_target_triple target_triple llmodule;
+    let pass_manager = Llvm.PassManager.create () in
+    Llvm_target.TargetMachine.add_analysis_passes pass_manager target_machine;
+    Llvm.PassManager.run_module llmodule pass_manager |> ignore;
+    (*Llvm_passmgr_builder.set_opt_level 3 pass_manager;*)
+    Llvm_target.TargetMachine.emit_to_file llmodule Llvm_target.CodeGenFileType.ObjectFile "out.o" target_machine;
+    Llvm.PassManager.dispose pass_manager;
+    Llvm.dispose_module llmodule;
+    Llvm.dispose_context context
