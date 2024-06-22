@@ -26,10 +26,10 @@ module Extractor (Ex: Extractor) = struct
 end
 
 let create_value = Scratch_value.(function
-    | Past.Number (_, value) -> NumberValue value
+    | Past.Number (_, value) -> Float value
     | Past.String (_, value) -> (match float_of_string_opt value with
-        | Some f -> NumberValue f
-        | None -> StringValue value
+        | Some f -> Float f
+        | None -> String value
     )
     | _ -> failwith "invalid value")
 
@@ -39,7 +39,7 @@ module VariableExtractor = Extractor(struct
         | (id, Past.Array (_, [Past.String (_, name); value])) -> 
                 {id = id;
                 name = name;
-                value = create_value value
+                value = Primitive (create_value value)
                 }
         | _ -> failwith "invalid variable format"
     let key = "variables"
@@ -51,7 +51,7 @@ module ListExtractor = Extractor(struct
         | (id, Past.Array (_, [Past.String(_, name); Past.Array(_, vals)])) -> {
             id = id;
             name = name;
-            value = Scratch_value.ListValue (List.map create_value vals)
+            value = List (List.map create_value vals)
         }
         | _ -> failwith "invalid list format"
     let key = "lists"
@@ -68,10 +68,10 @@ type general_block = {
 }
 
 let create_value = function
-    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 4.); Past.String (_, n)]))::_) -> Some (Value (NumberValue (float_of_string n)))
+    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, m); Past.String (_, n)]))::_) when m >= 4. && m <= 8. -> Some (Value (Primitive (Float (float_of_string n))))
     | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 10.); Past.String (_, str)]))::_) -> Some (match float_of_string_opt str with
-        | Some f -> Value (NumberValue f)
-        | None -> Value (StringValue str)
+        | Some f -> Value (Primitive (Float f))
+        | None -> Value (Primitive (String str))
     )
     | Past.Array(_, _::Past.String(_, id)::_) -> Some (Id id)
     | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 12.); _; Past.String (_, id)]))::_) -> Some (Variable id)
