@@ -68,7 +68,7 @@ type general_block = {
 }
 
 let create_value = function
-    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 4.); Past.String (_, n)]))::_) -> Some (Value (Primitive (Float (float_of_string n))))
+    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, m); Past.String (_, n)]))::_) when m >= 4. && m <= 8. -> Some (Value (Primitive (Float (float_of_string n))))
     | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 10.); Past.String (_, str)]))::_) -> Some (match float_of_string_opt str with
         | Some f -> Value (Primitive (Float f))
         | None -> Value (Primitive (String str))

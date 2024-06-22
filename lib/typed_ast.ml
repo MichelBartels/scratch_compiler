@@ -62,7 +62,7 @@ type scratch_function = {
 type program = {
     functions: (string * scratch_function) list;
     variables: (string * Scratch_value.t) list;
-    lists: (string * Scratch_value.t) list;
+    lists: (string * Scratch_value.t * Scratch_type.primitive_type) list;
     main: expr list
 }
 [@@ deriving show]

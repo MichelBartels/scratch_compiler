@@ -247,7 +247,7 @@ let convert_variable types (n, v) = (n, Scratch_value.Primitive (Scratch_value.c
 let convert_lists types (n, v) = (n, Scratch_value.List (match v with
     | Scratch_value.List l -> List.map (fun x -> Scratch_value.Primitive x) l |> List.map (Scratch_value.cast (list_type types n))
     | _ -> failwith "cannot cast to list"
-))
+), list_type types n)
 let convert_function types (n, f) = (n, {
     parameters = List.map (fun p -> (p, Scratch_type.Primitive (arg_type types (n, p)))) f.Untyped_ast.parameters;
     statements = List.map (convert_expr ~funname:n types) f.statements;

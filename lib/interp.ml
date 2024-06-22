@@ -199,6 +199,6 @@ let interp program =
     State.(let* _ = List.map (interp_expr program []) program.main in
     return None) {
         variables = program.variables;
-        lists = program.lists;
+        lists = List.map (fun (n, v, _) -> (n, v)) program.lists;
         answer = "";
     }

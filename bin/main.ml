@@ -1,4 +1,4 @@
-let test = "example_code/project.json"
+let test = "example_code/turing/project.json"
 
 open Scratch_compiler
 
