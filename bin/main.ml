@@ -4,8 +4,8 @@ open Scratch_compiler
 
 let () = Printexc.record_backtrace true
 
-let program = Parse.parse test
-let () = print_endline @@ Parse.show_program program
+let program = Parse.parse test |> Past_to_blocks.convert
+let () = print_endline @@ Blocks.show_program program
 (*let program = Front_end.front_end test
 let () = print_endline @@ Typed_ast.show_program program
 let _ = Typed_ast_to_llvm.convert program

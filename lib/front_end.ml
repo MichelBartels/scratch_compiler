@@ -1,6 +1,4 @@
-(* Exactly the front end provided in Slang interpreter *)
-
-open Lexing 
+(*open Lexing
 
 let error file action s = 
     Errors.complain ("\nERROR in " ^ file ^ " with " ^ action ^ " : " ^ s ^ "\n") 
@@ -29,3 +27,4 @@ let parse (file, lexbuf) =
     in (file, e) 
 
 let front_end file = (match (parse (init_lexbuf file)) with (_, v) -> v) |> Past_to_blocks.convert |> Blocks_to_untyped_ast.convert |> Untyped_ast_to_typed_ast.convert
+*)

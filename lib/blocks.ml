@@ -1,132 +1,114 @@
-type variable = {
+(*type variable = {
     id: string;
     name: string;
     value: Scratch_value.t;
 }
-[@@ deriving show]
-
-type input =
-    | Id of string
-    | Variable of string
-    | Value of Scratch_value.t
-[@@ deriving show]
+[@@ deriving show]*)
 
 type block =
+    | Constant of Scratch_value.primitive_value
+    | Variable of string
     | Argument of {
-        id: string;
         name: string;
     }
     | ProceduresDefinition of {
-        id: string;
-        next: string option;
+        next: block option;
         prototype: string;
     }
     | ProceduresPrototype of {
-        id: string;
-        parameters: (string * string) list;
+        parameters: block Parse.JsonMap.t;
         proccode: string;
     }
     | BinaryOperator of {
-        id: string;
         operator: Untyped_ast.binary_operator;
-        arg1: input;
-        arg2: input;
+        arg1: block;
+        arg2: block;
     }
     | Not of {
-        id: string;
-        arg: input;
+        arg: block;
     }
     | ProceduresCall of {
-        id: string;
-        next: string option;
-        inputs: (string * input) list;
+        next: block option;
+        inputs: block Parse.JsonMap.t;
         proccode: string
     }
     | Start of {
-        id: string;
-        next: string option;
+        next: block option;
     }
     | IfThenElse of {
-        id: string;
-        next: string option;
-        condition: string;
-        then_branch: string option;
-        else_branch: string option;
+        next: block option;
+        condition: block;
+        then_branch: block option;
+        else_branch: block option;
     }
     | SetVariable of {
-        id: string;
-        next: string option;
+        next: block option;
         variable: string;
-        value: input;
+        value: block;
     }
     | AddToList of {
-        id: string;
-        next: string option;
+        next: block option;
         list: string;
-        item: input;
+        item: block;
     }
     | DeleteAllOfList of {
-        id: string;
-        next: string option;
+        next: block option;
         list: string;
     }
     | NumOfList of {
-        id: string;
         list: string;
-        item: input;
+        item: block;
     }
     | ChangeVariableBy of {
-        id: string;
-        next: string option;
-        value: input;
+        next: block option;
+        value: block;
         variable: string;
     }
     | ItemOfList of {
-        id: string;
         list: string;
-        index: input
+        index: block;
     }
     | ReplaceItemOfList of {
-        id: string;
-        next: string option;
+        next: block option;
         list: string;
-        index: input;
-        item: input
+        index: block;
+        item: block
     }
     | LengthOfList of {
-        id: string;
         list: string;
     }
     | RepeatUntil of {
-        id: string;
-        next: string option;
-        condition: input;
-        body: string option;
+        next: block option;
+        condition: block;
+        body: block option;
     }
     | Repeat of {
-        id: string;
-        next: string option;
-        count: input;
-        body: string option;
+        next: block option;
+        count: block;
+        body: block option;
     }
     | Say of {
-        id: string;
-        next: string option;
-        message: input;
+        next: block option;
+        message: block;
     }
     | Ask of {
-        id: string;
-        next: string option;
-        question: input;
+        next: block option;
+        question: block;
     }
-    | Answer of {
-        id: string;
-    }
+    | Answer
+[@@ deriving show]
+
+type variables = Scratch_value.t Parse.JsonMap.t
+[@@ deriving show]
+
+type sprite = {
+    variables: variables;
+    blocks: block list
+}
 [@@ deriving show]
 
 type program = {
-    variables: variable list;
-    lists: variable list;
-    blocks: block list
+    sprites: sprite list;
+    globals: variables;
 }
 [@@ deriving show]

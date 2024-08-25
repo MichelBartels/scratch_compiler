@@ -26,44 +26,33 @@ end = struct
     pp pp' Format.str_formatter m;
     Format.flush_str_formatter ()
 end
-type value =
-  | String of string
-  | Float of float
-  | Int of int
+
+type primitive_value = Scratch_value.primitive_value
 [@@deriving show]
 
-let value_to_yojson = function
-  | String s -> `String s
-  | Float f -> `Float f
-  | Int i -> `Int i
+let primitive_value_to_yojson = function
+  | Scratch_value.String s -> `String s
+  | Scratch_value.Float f -> `Float f
+  | Scratch_value.Boolean b -> `Bool b
 
-let value_of_yojson = function
-  | `String s -> Result.ok @@ String s
-  | `Float f -> Result.ok @@ Float f
-  | `Int i -> Result.ok @@ Int i
-  | _ ->  Result.error "value_of_yojson: expected `String or `Float"
+let primitive_value_of_yojson = function
+  | `String s -> Ok (Scratch_value.String s)
+  | `Float f -> Ok (Scratch_value.Float f)
+  | `Bool b -> Ok (Scratch_value.Boolean b)
+  | `Int i -> Ok (Scratch_value.Float (float_of_int i))
+  | _ -> Error "primitive_value_of_yojson: expected `String, `Bool, `Int or `Float"
 
 type input =
     | Id of string
     | Variable of string
-    | Value of Scratch_value.t
+    | Value of Scratch_value.primitive_value
 [@@ deriving show]
 
-let create_value = function
-    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, m); Past.String (_, n)]))::_) when m >= 4. && m <= 8. -> Some (Value (Primitive (Float (float_of_string n))))
-    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 10.); Past.String (_, str)]))::_) -> Some (match float_of_string_opt str with
-        | Some f -> Value (Primitive (Float f))
-        | None -> Value (Primitive (String str))
-    )
-    | Past.Array(_, _::Past.String(_, id)::_) -> Some (Id id)
-    | Past.Array(_, _::(Past.Array (_, [Past.Number (_, 12.); _; Past.String (_, id)]))::_) -> Some (Variable id)
-    | _ -> None
-
 let input_of_yojson = function
-  | `List (_::`List [`Int m; `String n]::_) when m >= 4 && m <= 8 -> Ok (Value (Scratch_value.Primitive (Float (float_of_string n))))
+  | `List (_::`List [`Int m; `String n]::_) when m >= 4 && m <= 8 -> Ok (Value (Float (float_of_string n)))
   | `List (_::`List [`Int 10; `String str]::_) -> (match float_of_string_opt str with
-      | Some f -> Ok (Value (Scratch_value.Primitive (Float f)))
-      | None -> Ok (Value (Scratch_value.Primitive (String str)))
+      | Some f -> Ok (Value (Float f))
+      | None -> Ok (Value (String str))
     )
   | `List (_::`String id::_) -> Ok (Id id)
   | `List (_::`List [`Int 12; _; `String id]::_) -> Ok (Variable id)
@@ -71,23 +60,29 @@ let input_of_yojson = function
 
 let input_to_yojson _ = failwith "input_to_yojson: not implemented"
 
-type block = {
-  opcode: string;
-  next: string option;
-  parent: string option;
-  inputs: input JsonMap.t;
-  fields: (string * string option) JsonMap.t;
+type mutation = {
+  proccode: string;
 }
 [@@deriving show, yojson { strict = false }]
 
-type variable = string * value
+type block = {
+  opcode: string;
+  next: string option;
+(*  parent: string option;*)
+  inputs: input JsonMap.t;
+  fields: (string * string option) JsonMap.t;
+  mutation: mutation option [@default None];
+}
+[@@deriving show, yojson { strict = false }]
+
+type variable = string * primitive_value
 [@@deriving show, yojson { strict = false }]
 
 type target = {
   is_stage: bool [@key "isStage"];
   name: string;
   variables: variable JsonMap.t;
-  lists: (string * value list) JsonMap.t;
+  lists: (string * primitive_value list) JsonMap.t;
   blocks: block JsonMap.t;
 }
 [@@deriving show, yojson { strict = false }]
