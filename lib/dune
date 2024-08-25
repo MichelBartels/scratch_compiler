@@ -1,6 +1,6 @@
 (library
  (name scratch_compiler)
- (preprocess (pps ppx_deriving.show))
- (libraries llvm llvm.all_backends llvm.analysis llvm.target))
+ (preprocess (pps ppx_deriving.show ppx_deriving_yojson))
+ (libraries llvm llvm.all_backends llvm.analysis llvm.target llvm.passbuilder yojson))
 (ocamllex lexer)
 (ocamlyacc parser)
