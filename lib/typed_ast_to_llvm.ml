@@ -310,11 +310,10 @@ let aot_compile () =
     let target_data = Llvm_target.TargetMachine.data_layout target_machine |> Llvm_target.DataLayout.as_string in
     Llvm.set_data_layout target_data llmodule;
     Llvm.set_target_triple target_triple llmodule;
-    let pass_manager = Llvm.PassManager.create () in
-    Llvm_target.TargetMachine.add_analysis_passes pass_manager target_machine;
-    Llvm.PassManager.run_module llmodule pass_manager |> ignore;
+    let passbuilder_options = Llvm_passbuilder.create_passbuilder_options () in
+    Llvm_passbuilder.run_passes llmodule "default<O3>" target_machine passbuilder_options |> Result.get_ok;
     (*Llvm_passmgr_builder.set_opt_level 3 pass_manager;*)
     Llvm_target.TargetMachine.emit_to_file llmodule Llvm_target.CodeGenFileType.ObjectFile "out.o" target_machine;
-    Llvm.PassManager.dispose pass_manager;
+    (*Llvm_passbuilder.dispose_passbuilder_options passbuilder_options;*)
     Llvm.dispose_module llmodule;
     Llvm.dispose_context context
