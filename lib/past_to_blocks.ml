@@ -24,7 +24,7 @@ let parse_target target =
             | "procedures_definition" -> Blocks.ProceduresDefinition {
                 next = next;
                 prototype = (match StringMap.find_opt "custom_block" inputs with
-                    | Some (Id prot) -> prot
+                    | Some (Id prot) -> create_block prot
                     | _ -> failwith "invalid procedures_definition declaration")
             }
             | "procedures_prototype" -> ProceduresPrototype {
@@ -47,7 +47,8 @@ let parse_target target =
             }
             | "procedures_call" -> ProceduresCall {
                 next = next;
-                inputs = StringMap.map (fun input -> input_to_block input) inputs;
+                inputs = StringMap.bindings inputs
+                         |> List.map (fun (name, input) -> (name, input_to_block input));
                 proccode = Option.get proccode;
             }
             | "event_whenflagclicked" -> Start {

@@ -1,4 +1,4 @@
-open Typed_ast
+(*open Typed_ast
 
 let context = Llvm.create_context ()
 let llmodule = Llvm.create_module context "module"
@@ -317,3 +317,4 @@ let aot_compile () =
     (*Llvm_passbuilder.dispose_passbuilder_options passbuilder_options;*)
     Llvm.dispose_module llmodule;
     Llvm.dispose_context context
+*)

@@ -1,10 +1,3 @@
-(*type variable = {
-    id: string;
-    name: string;
-    value: Scratch_value.t;
-}
-[@@ deriving show]*)
-
 type block =
     | Constant of Scratch_value.primitive_value
     | Variable of string
@@ -13,7 +6,7 @@ type block =
     }
     | ProceduresDefinition of {
         next: block option;
-        prototype: string;
+        prototype: block;
     }
     | ProceduresPrototype of {
         parameters: block Parse.JsonMap.t;
@@ -29,7 +22,7 @@ type block =
     }
     | ProceduresCall of {
         next: block option;
-        inputs: block Parse.JsonMap.t;
+        inputs: (string * block) list;
         proccode: string
     }
     | Start of {

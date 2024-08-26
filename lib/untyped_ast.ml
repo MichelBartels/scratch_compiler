@@ -15,37 +15,48 @@ type expr =
     | Literal of Scratch_value.t
     | BinaryOperator of binary_operator * expr * expr
     | Not of expr
-    | FuncCall of string * (string * expr) list
-    | Branch of expr * expr list * expr list
+    | Index of string * expr
+    | IndexOf of string * expr
+    | Length of string
+    | Answer
+[@@ deriving show]
+
+type statement =
+    | FuncCall of string * expr Parse.JsonMap.t
+    | Branch of expr * statement list * statement list
     | SetVariable of string * expr
     | AddToList of string * expr
     | DeleteAllOfList of string
-    | Index of string * expr
     | IncrVariable of string * expr
-    | IndexOf of string * expr
     | SetIndex of {
         list: string;
         index: expr;
         value: expr
     }
-    | Length of string
-    | WhileNot of expr * (expr list)
-    | Repeat of expr * (expr list)
+    | WhileNot of expr * (statement list)
+    | Repeat of expr * (statement list)
     | Say of expr
     | Ask of expr
-    | Answer
 [@@ deriving show]
 
-type function_ = {
+type code = statement list
+[@@ deriving show]
+
+type scratch_function = {
   parameters: string list;
-  statements: expr list;
+  code: code;
+}
+[@@ deriving show]
+
+type sprite = {
+    functions: scratch_function Parse.JsonMap.t;
+    variables: Scratch_value.t Parse.JsonMap.t;
+    entry_points: code list;
 }
 [@@ deriving show]
 
 type program = {
-    functions: (string * function_) list;
-    variables: (string * Scratch_value.t) list;
-    lists: (string * Scratch_value.t) list;
-    main: expr list;
+    sprites: sprite list;
+    globals: Scratch_value.t Parse.JsonMap.t;
 }
 [@@ deriving show]
