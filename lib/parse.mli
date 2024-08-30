@@ -9,6 +9,9 @@ type input =
     | Id of string
     | Variable of string
     | Value of Scratch_value.primitive_value
+[@@ deriving show]
+
+type input_opt = input option
 [@@ deriving show, yojson]
 
 type mutation = {
@@ -20,7 +23,7 @@ type block = {
   opcode: string;
   next: string option;
 (*  parent: string option;*)
-  inputs: input JsonMap.t;
+  inputs: input_opt JsonMap.t;
   fields: (string * string option) JsonMap.t;
   mutation: mutation option [@default None];
 }

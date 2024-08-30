@@ -24,11 +24,11 @@ let parse_target target =
             | "procedures_definition" -> Blocks.ProceduresDefinition {
                 next = next;
                 prototype = (match StringMap.find_opt "custom_block" inputs with
-                    | Some (Id prot) -> create_block prot
+                    | Some (Some (Id prot)) -> create_block prot
                     | _ -> failwith "invalid procedures_definition declaration")
             }
             | "procedures_prototype" -> ProceduresPrototype {
-                parameters = StringMap.map input_to_block inputs;
+                parameters = StringMap.map input_to_block inputs |> StringMap.map Option.get;
                 proccode = Option.get proccode
             }
             | "argument_reporter_string_number" -> Argument {
@@ -48,7 +48,7 @@ let parse_target target =
             | "procedures_call" -> ProceduresCall {
                 next = next;
                 inputs = StringMap.bindings inputs
-                         |> List.map (fun (name, input) -> (name, input_to_block input));
+                         |> List.map (fun (name, input) -> (name, Option.get (input_to_block input)));
                 proccode = Option.get proccode;
             }
             | "event_whenflagclicked" -> Start {
@@ -130,10 +130,13 @@ let parse_target target =
             arg2 = input_field_to_block inputs arg2;
         }
     and input_to_block = function
-        | Id id -> create_block id
-        | Variable var -> Blocks.Variable var
-        | Value value -> Blocks.Constant value
-    and input_field_to_block_opt inputs field = StringMap.find_opt field inputs |> Option.map input_to_block
+        | Some (Id id) -> Some (create_block id)
+        | Some (Variable var) -> Some (Blocks.Variable var)
+        | Some (Value value) -> Some (Blocks.Constant value)
+        | None -> None
+    and input_field_to_block_opt inputs field =
+      let input = StringMap.find_opt field inputs in
+      Option.bind input input_to_block
     and input_field_to_block inputs field = Option.get (input_field_to_block_opt inputs field)
     and extract_field fields field = StringMap.find field fields |> snd |> Option.get in
     let variables = get_variables target in

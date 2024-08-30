@@ -48,17 +48,21 @@ type input =
     | Value of Scratch_value.primitive_value
 [@@ deriving show]
 
-let input_of_yojson = function
-  | `List (_::`List [`Int m; `String n]::_) when m >= 4 && m <= 8 -> Ok (Value (Float (float_of_string n)))
-  | `List (_::`List [`Int 10; `String str]::_) -> (match float_of_string_opt str with
-      | Some f -> Ok (Value (Float f))
-      | None -> Ok (Value (String str))
-    )
-  | `List (_::`String id::_) -> Ok (Id id)
-  | `List (_::`List [`Int 12; _; `String id]::_) -> Ok (Variable id)
+type input_opt = input option
+[@@ deriving show]
+
+let input_opt_of_yojson = function
+  | `List (_::`List [`Int m; `String n]::_) when m >= 4 && m <= 8 -> Ok (Some (Value (Float (float_of_string n))))
+  | `List (_::`List [`Int 10; `String str]::_) -> Ok (Some (match float_of_string_opt str with
+      | Some f -> Value (Float f)
+      | None -> Value (String str)
+    ))
+  | `List (_::`String id::_) -> Ok (Some (Id id))
+  | `List (_::`List [`Int 12; _; `String id]::_) -> Ok (Some (Variable id))
+  | `List (_::`Null::_) -> Ok None
   | json -> Error ("input_of_yojson: expected `List, got instead " ^ Yojson.Safe.to_string json)
 
-let input_to_yojson _ = failwith "input_to_yojson: not implemented"
+let input_opt_to_yojson _ = failwith "input_to_yojson: not implemented"
 
 type mutation = {
   proccode: string;
@@ -69,7 +73,7 @@ type block = {
   opcode: string;
   next: string option;
 (*  parent: string option;*)
-  inputs: input JsonMap.t;
+  inputs: input_opt JsonMap.t;
   fields: (string * string option) JsonMap.t;
   mutation: mutation option [@default None];
 }

@@ -4,13 +4,13 @@ open Scratch_compiler
 
 let () = Printexc.record_backtrace true
 
-let untyped_ast =
-  Parse.parse test |> Past_to_blocks.convert |> Blocks_to_untyped_ast.convert
+let typed_ast =
+  Parse.parse test |> Past_to_blocks.convert |> Blocks_to_untyped_ast.convert |> Untyped_ast_to_typed_ast.convert
 
-let () = print_endline @@ Untyped_ast.show_program untyped_ast
+(*let () = print_endline @@ Untyped_ast.show_program untyped_ast*)
 
 let () =
-  untyped_ast |> Untyped_ast_to_typed_ast.convert |> Typed_ast_to_llvm.convert
+  typed_ast |> Typed_ast_to_llvm.convert
 
 let () = print_endline @@ Llvm.string_of_llmodule Typed_ast_to_llvm.llmodule
 let () = Typed_ast_to_llvm.aot_compile ()

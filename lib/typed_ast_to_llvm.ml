@@ -496,7 +496,8 @@ let convert (p : Typed_ast.program) =
     |> List.concat
   in
   Llvm.position_at_end entry builder;
-  let threads =
+  ignore @@ List.map (fun f -> Function.call f Parse.StringMap.empty) entry_points;
+  (*let threads =
     List.map
       (fun entry_point ->
         let ptr = Function.func_ptr entry_point in
@@ -506,7 +507,7 @@ let convert (p : Typed_ast.program) =
   ignore
   @@ List.map
        (fun thread -> RuntimeFunction.call join_thread [ thread ])
-       threads;
+       threads;*)
   ignore @@ Llvm.build_ret_void builder
 
 let aot_compile () =
