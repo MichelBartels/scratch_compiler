@@ -1,11 +1,11 @@
-open Typed_ast
+(*open Typed_ast
 
 module type Monad = sig
     type 'a t
     val return: 'a -> 'a t
     val (let+): 'a t -> ('a -> 'b t) -> 'b t
     val (and+): 'a t -> 'b t -> ('a * 'b) t
-    val (let*): 'a t list -> ('a list -> 'b t) -> 'b t
+    val (let_): 'a t list -> ('a list -> 'b t) -> 'b t
 end
 type state = {
     variables: (string * Scratch_value.t) list;
@@ -23,7 +23,7 @@ module State: Monad with type 'a t = state -> 'a * state = struct
         let (v1, state) = t1 state in
         let (v2, state) = t2 state in
         ((v1, v2), state)
-    let (let*) ts f = fun state ->
+    let (let_) ts f = fun state ->
         let (vs, state) = List.fold_left (fun (vs, state) t ->
             let (v, state) = t state in
             (v::vs, state)) ([], state) ts in
@@ -202,3 +202,4 @@ let interp program =
         lists = List.map (fun (n, v, _) -> (n, v)) program.lists;
         answer = "";
     }
+*)

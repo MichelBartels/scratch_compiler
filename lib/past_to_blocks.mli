@@ -1,1 +1,1 @@
-val convert: Past.value -> Blocks.program
+val convert: Parse.program -> Blocks.program
