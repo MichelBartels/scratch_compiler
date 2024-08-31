@@ -328,6 +328,7 @@ let rec convert_expr cur_fn vars funcs answer e =
       | Boolean -> RuntimeFunction.call index_of_bool [ list; value ])
   | Length l -> (
       let list_type, list = Parse.StringMap.find l vars in
+      let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       match list_type with
       | Scratch_type.Float -> RuntimeFunction.call len_of_f64_vec [ list ]
       | String -> RuntimeFunction.call len_of_string_vec [ list ]
@@ -496,8 +497,8 @@ let convert (p : Typed_ast.program) =
     |> List.concat
   in
   Llvm.position_at_end entry builder;
-  ignore @@ List.map (fun f -> Function.call f Parse.StringMap.empty) entry_points;
-  (*let threads =
+  (*ignore @@ List.map (fun f -> Function.call f Parse.StringMap.empty) entry_points;*)
+  let threads =
     List.map
       (fun entry_point ->
         let ptr = Function.func_ptr entry_point in
@@ -507,7 +508,7 @@ let convert (p : Typed_ast.program) =
   ignore
   @@ List.map
        (fun thread -> RuntimeFunction.call join_thread [ thread ])
-       threads;*)
+       threads;
   ignore @@ Llvm.build_ret_void builder
 
 let aot_compile () =

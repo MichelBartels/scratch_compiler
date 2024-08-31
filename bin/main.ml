@@ -7,7 +7,7 @@ let () = Printexc.record_backtrace true
 let typed_ast =
   Parse.parse test |> Past_to_blocks.convert |> Blocks_to_untyped_ast.convert |> Untyped_ast_to_typed_ast.convert
 
-(*let () = print_endline @@ Untyped_ast.show_program untyped_ast*)
+let () = print_endline @@ Typed_ast.show_program typed_ast
 
 let () =
   typed_ast |> Typed_ast_to_llvm.convert
