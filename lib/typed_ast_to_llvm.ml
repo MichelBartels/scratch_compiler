@@ -66,8 +66,8 @@ let say =
 
 let ask =
   RuntimeFunction.declare "ask"
-    [ Llvm.pointer_type context; Llvm.pointer_type context ]
-    (Llvm.void_type context)
+    [ Llvm.pointer_type context ]
+    (Llvm.pointer_type context)
 
 let cast_double_to_string =
   RuntimeFunction.declare "cast_f64_to_string"
@@ -214,6 +214,9 @@ let join_thread =
     [ Llvm.pointer_type context ]
     (Llvm.void_type context)
 
+let create_window =
+  RuntimeFunction.declare "create_window" [] (Llvm.pointer_type context)
+
 let create_literal = function
   | Scratch_value.Float n -> Llvm.const_float (Llvm.double_type context) n
   | Boolean b -> Llvm.const_int (Llvm.i1_type context) (if b then 1 else 0)
@@ -264,10 +267,7 @@ let init_variable (value, scratch_type) =
     | Scratch_value.List l -> init_list l scratch_type )
 
 let init_answer () =
-  let lltype = Llvm.pointer_type context in
-  let answer = Llvm.declare_global lltype "answer" llmodule in
-  Llvm.set_initializer (Llvm.const_pointer_null lltype) answer;
-  answer
+  init_primitive (Scratch_value.String "") String
 
 let init_variables = Parse.StringMap.map init_variable
 
@@ -341,7 +341,8 @@ let rec convert_expr cur_fn vars funcs answer e =
       | Primitive String, Primitive Float ->
           RuntimeFunction.call cast_string_to_double [ convert_expr e ]
       | _ -> failwith "Unsupported cast")
-  | Answer -> answer
+  | Answer ->
+      Llvm.build_load (Llvm.pointer_type context) answer "" builder
 
 let rec convert_statement cur_fn vars funcs answer stmt =
   let convert_expr = convert_expr cur_fn vars funcs answer in
@@ -445,7 +446,9 @@ let rec convert_statement cur_fn vars funcs answer stmt =
   | Say e -> RuntimeFunction.call say [ convert_expr e ]
   | Ask e ->
       let question = convert_expr e in
-      RuntimeFunction.call ask [ question; answer ]
+      let result = RuntimeFunction.call ask [ question ] in
+      let store = Llvm.build_store result answer builder in
+      store
 
 let convert_function scratch_f f =
   Llvm.position_at_end f builder;
@@ -498,17 +501,13 @@ let convert (p : Typed_ast.program) =
   in
   Llvm.position_at_end entry builder;
   (*ignore @@ List.map (fun f -> Function.call f Parse.StringMap.empty) entry_points;*)
-  let threads =
+  ignore @@
     List.map
       (fun entry_point ->
         let ptr = Function.func_ptr entry_point in
         RuntimeFunction.call spawn_thread [ ptr ])
-      entry_points
-  in
-  ignore
-  @@ List.map
-       (fun thread -> RuntimeFunction.call join_thread [ thread ])
-       threads;
+      entry_points;
+  ignore @@ RuntimeFunction.call create_window [];
   ignore @@ Llvm.build_ret_void builder
 
 let aot_compile () =
