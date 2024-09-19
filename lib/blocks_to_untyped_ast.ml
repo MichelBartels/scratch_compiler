@@ -27,6 +27,12 @@ let rec expr_of_block = function
       Untyped_ast.Length l.list
   | Answer ->
       Untyped_ast.Answer
+  | XPosition ->
+      Untyped_ast.XPosition
+  | YPosition ->
+      Untyped_ast.YPosition
+  | Direction ->
+      Untyped_ast.Direction
   | _ ->
       failwith "block is not a valid expression"
 
@@ -77,6 +83,30 @@ let rec statements_of_block parameter_mapping = function
   | Ask a ->
       Untyped_ast.Ask (expr_of_block a.question)
       :: statements_of_block_opt parameter_mapping a.next
+  | SetX x ->
+      Untyped_ast.SetX (expr_of_block x.x)
+      :: statements_of_block_opt parameter_mapping x.next
+  | SetY y ->
+      Untyped_ast.SetY (expr_of_block y.y)
+      :: statements_of_block_opt parameter_mapping y.next
+  | ChangeXBy x ->
+      Untyped_ast.ChangeX (expr_of_block x.x)
+      :: statements_of_block_opt parameter_mapping x.next
+  | ChangeYBy y ->
+      Untyped_ast.ChangeY (expr_of_block y.y)
+      :: statements_of_block_opt parameter_mapping y.next
+  | GoTo g ->
+      Untyped_ast.GoTo {x= expr_of_block g.x; y= expr_of_block g.y}
+      :: statements_of_block_opt parameter_mapping g.next
+  | TurnRight d ->
+      Untyped_ast.TurnRight (expr_of_block d.degrees)
+      :: statements_of_block_opt parameter_mapping d.next
+  | TurnLeft d ->
+      Untyped_ast.TurnLeft (expr_of_block d.degrees)
+      :: statements_of_block_opt parameter_mapping d.next
+  | MoveSteps steps ->
+      Untyped_ast.MoveSteps (expr_of_block steps.steps)
+      :: statements_of_block_opt parameter_mapping steps.next
   | block ->
       failwith @@ "block is not a valid statement" ^ show_block block
 
@@ -135,7 +165,10 @@ let convert_sprite sprite =
     ; variables= sprite.variables
     ; entry_points= create_entrypoints global_parameter_mapping sprite
     ; current_costume= sprite.current_costume
-    ; costumes= sprite.costumes }
+    ; costumes= sprite.costumes
+    ; x= sprite.x
+    ; y= sprite.y
+    ; direction= sprite.direction }
 
 let convert (program : program) =
   Untyped_ast.

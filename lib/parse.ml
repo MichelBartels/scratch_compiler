@@ -99,14 +99,6 @@ type block =
 type variable = string * primitive_value
 [@@deriving show, yojson {strict= false}]
 
-type costume =
-  { asset_id: string [@key "assetId"]
-  ; name: string
-  ; bitmap_resolution: int option [@key "bitmapResolution"] [@default None]
-  ; rotation_center_x: int [@key "rotationCenterX"]
-  ; rotation_center_y: int [@key "rotationCenterY"] }
-[@@deriving show, yojson {strict= false}]
-
 type target =
   { is_stage: bool [@key "isStage"]
   ; name: string
@@ -114,7 +106,10 @@ type target =
   ; lists: (string * primitive_value list) JsonMap.t
   ; blocks: block JsonMap.t
   ; current_costume: int [@key "currentCostume"]
-  ; costumes: costume list }
+  ; costumes: Costume.t list
+  ; x: float [@default 0.]
+  ; y: float [@default 0.]
+  ; direction: float [@default 90.] }
 [@@deriving show, yojson {strict= false}]
 
 type program = {targets: target list}

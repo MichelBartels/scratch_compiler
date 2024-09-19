@@ -21,13 +21,6 @@ let partition_targets targets =
   in
   (List.hd stages, sprites)
 
-let convert_costume (costume : Parse.costume) : Blocks.costume =
-  { asset_id= costume.asset_id
-  ; name= costume.name
-  ; bitmap_resolution= Option.value ~default:1 costume.bitmap_resolution
-  ; rotation_center_x= costume.rotation_center_x
-  ; rotation_center_y= costume.rotation_center_y }
-
 let parse_target target =
   let blocks = ref StringMap.empty in
   let rec create_block id =
@@ -151,6 +144,31 @@ let parse_target target =
               Ask {next; question= input_field_to_block inputs "QUESTION"}
           | "sensing_answer" ->
               Answer
+          | "motion_setx" ->
+              SetX {next; x= input_field_to_block inputs "X"}
+          | "motion_sety" ->
+              SetY {next; y= input_field_to_block inputs "Y"}
+          | "motion_changexby" ->
+              ChangeXBy {next; x= input_field_to_block inputs "DX"}
+          | "motion_changeyby" ->
+              ChangeYBy {next; y= input_field_to_block inputs "DY"}
+          | "motion_gotoxy" ->
+              GoTo
+                { next
+                ; x= input_field_to_block inputs "X"
+                ; y= input_field_to_block inputs "Y" }
+          | "motion_turnright" ->
+              TurnRight {next; degrees= input_field_to_block inputs "DEGREES"}
+          | "motion_turnleft" ->
+              TurnLeft {next; degrees= input_field_to_block inputs "DEGREES"}
+          | "motion_xposition" ->
+              XPosition
+          | "motion_yposition" ->
+              YPosition
+          | "motion_direction" ->
+              Direction
+          | "motion_movesteps" ->
+              MoveSteps {next; steps= input_field_to_block inputs "STEPS"}
           | opcode ->
               failwith @@ "invalid opcode: " ^ opcode
         in
@@ -185,8 +203,13 @@ let parse_target target =
     List.map (fun (id, _) -> create_block id)
     @@ StringMap.bindings target.blocks
   in
-  let costumes = List.map convert_costume target.costumes in
-  {variables; blocks; current_costume= target.current_costume; costumes}
+  { variables
+  ; blocks
+  ; current_costume= target.current_costume
+  ; costumes= target.costumes
+  ; x= target.x
+  ; y= target.y
+  ; direction= target.direction }
 
 let convert program =
   let target, sprites = partition_targets program.targets in

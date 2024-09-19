@@ -8,6 +8,9 @@ type expr =
   | IndexOf of string * expr
   | Length of string
   | Answer
+  | XPosition
+  | YPosition
+  | Direction
   | Cast of expr * Scratch_type.t
 [@@deriving show]
 
@@ -23,6 +26,14 @@ type statement =
   | Repeat of expr * statement list
   | Say of expr
   | Ask of expr
+  | SetX of expr
+  | SetY of expr
+  | ChangeX of expr
+  | ChangeY of expr
+  | GoTo of {x: expr; y: expr}
+  | TurnRight of expr
+  | TurnLeft of expr
+  | MoveSteps of expr
 [@@deriving show]
 
 let get_type = function
@@ -58,6 +69,12 @@ let get_type = function
       Primitive Float
   | Answer ->
       Primitive String
+  | XPosition ->
+      Primitive Float
+  | YPosition ->
+      Primitive Float
+  | Direction ->
+      Primitive Float
   | Cast (_, t) ->
       t
 
@@ -71,7 +88,10 @@ type sprite =
   ; variables: (Scratch_value.t * Scratch_type.primitive_type) Parse.JsonMap.t
   ; entry_points: code list
   ; current_costume: int
-  ; costumes: Costume.t list }
+  ; costumes: Costume.t list
+  ; x: float
+  ; y: float
+  ; direction: float }
 [@@deriving show]
 
 type program =

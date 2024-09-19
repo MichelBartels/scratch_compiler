@@ -29,6 +29,17 @@ type block =
   | Say of {next: block option; message: block}
   | Ask of {next: block option; question: block}
   | Answer
+  | SetX of {next: block option; x: block}
+  | SetY of {next: block option; y: block}
+  | ChangeXBy of {next: block option; x: block}
+  | ChangeYBy of {next: block option; y: block}
+  | GoTo of {next: block option; x: block; y: block}
+  | TurnRight of {next: block option; degrees: block}
+  | TurnLeft of {next: block option; degrees: block}
+  | MoveSteps of {next: block option; steps: block}
+  | XPosition
+  | YPosition
+  | Direction
 [@@deriving show]
 
 type variables = Scratch_value.t Parse.JsonMap.t [@@deriving show]
@@ -39,7 +50,10 @@ type sprite =
   { variables: variables
   ; blocks: block list
   ; current_costume: int
-  ; costumes: costume list }
+  ; costumes: costume list
+  ; x: float
+  ; y: float
+  ; direction: float }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: variables} [@@deriving show]

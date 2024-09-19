@@ -19,6 +19,9 @@ type expr =
   | IndexOf of string * expr
   | Length of string
   | Answer
+  | XPosition
+  | YPosition
+  | Direction
 [@@deriving show]
 
 type statement =
@@ -33,6 +36,14 @@ type statement =
   | Repeat of expr * statement list
   | Say of expr
   | Ask of expr
+  | SetX of expr
+  | SetY of expr
+  | ChangeX of expr
+  | ChangeY of expr
+  | GoTo of {x: expr; y: expr}
+  | TurnRight of expr
+  | TurnLeft of expr
+  | MoveSteps of expr
 [@@deriving show]
 
 type code = statement list [@@deriving show]
@@ -44,7 +55,10 @@ type sprite =
   ; variables: Scratch_value.t Parse.JsonMap.t
   ; entry_points: code list
   ; current_costume: int
-  ; costumes: Costume.t list }
+  ; costumes: Costume.t list
+  ; x: float
+  ; y: float
+  ; direction: float }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: Scratch_value.t Parse.JsonMap.t}
