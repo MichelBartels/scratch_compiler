@@ -169,6 +169,16 @@ let parse_target target =
               Direction
           | "motion_movesteps" ->
               MoveSteps {next; steps= input_field_to_block inputs "STEPS"}
+          | "motion_glidesecstoxy" ->
+              GlideToXY
+                { next
+                ; x= input_field_to_block inputs "X"
+                ; y= input_field_to_block inputs "Y"
+                ; duration= input_field_to_block inputs "SECS" }
+          | "motion_pointtowards" ->
+              PointTowards {next; target= input_field_to_block inputs "TOWARDS"}
+          | "motion_pointtowards_menu" ->
+              PointTowardsMenu StringMap.(find "TOWARDS" fields |> fst)
           | opcode ->
               failwith @@ "invalid opcode: " ^ opcode
         in
@@ -207,6 +217,7 @@ let parse_target target =
   ; blocks
   ; current_costume= target.current_costume
   ; costumes= target.costumes
+  ; name= target.name
   ; x= target.x
   ; y= target.y
   ; direction= target.direction }

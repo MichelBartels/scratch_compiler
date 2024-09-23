@@ -453,6 +453,13 @@ let rec convert_statement ?funname types stmt =
       TurnLeft (convert d |> cast (Primitive Float))
   | MoveSteps steps ->
       MoveSteps (convert steps |> cast (Primitive Float))
+  | GlideToXY g ->
+      GlideToXY
+        { x= convert g.x |> cast (Primitive Float)
+        ; y= convert g.y |> cast (Primitive Float)
+        ; duration= convert g.duration |> cast (Primitive Float) }
+  | PointTowards p ->
+      PointTowards p
 
 let convert_variable types n v =
   let t = var_type types n in
@@ -488,6 +495,7 @@ let convert_sprite types sprite =
         sprite.Untyped_ast.entry_points
   ; current_costume= sprite.Untyped_ast.current_costume
   ; costumes= sprite.Untyped_ast.costumes
+  ; name= sprite.Untyped_ast.name
   ; x= sprite.Untyped_ast.x
   ; y= sprite.Untyped_ast.y
   ; direction= sprite.Untyped_ast.direction }

@@ -40,6 +40,9 @@ type block =
   | XPosition
   | YPosition
   | Direction
+  | GlideToXY of {next: block option; x: block; y: block; duration: block}
+  | PointTowards of {next: block option; target: block}
+  | PointTowardsMenu of string
 [@@deriving show]
 
 type variables = Scratch_value.t Parse.JsonMap.t [@@deriving show]
@@ -51,6 +54,7 @@ type sprite =
   ; blocks: block list
   ; current_costume: int
   ; costumes: costume list
+  ; name: string
   ; x: float
   ; y: float
   ; direction: float }

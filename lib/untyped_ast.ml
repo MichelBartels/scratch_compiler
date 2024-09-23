@@ -44,6 +44,8 @@ type statement =
   | TurnRight of expr
   | TurnLeft of expr
   | MoveSteps of expr
+  | GlideToXY of {x: expr; y: expr; duration: expr}
+  | PointTowards of string
 [@@deriving show]
 
 type code = statement list [@@deriving show]
@@ -56,6 +58,7 @@ type sprite =
   ; entry_points: code list
   ; current_costume: int
   ; costumes: Costume.t list
+  ; name: string
   ; x: float
   ; y: float
   ; direction: float }

@@ -34,6 +34,8 @@ type statement =
   | TurnRight of expr
   | TurnLeft of expr
   | MoveSteps of expr
+  | GlideToXY of {x: expr; y: expr; duration: expr}
+  | PointTowards of string
 [@@deriving show]
 
 let get_type = function
@@ -89,6 +91,7 @@ type sprite =
   ; entry_points: code list
   ; current_costume: int
   ; costumes: Costume.t list
+  ; name: string
   ; x: float
   ; y: float
   ; direction: float }
