@@ -28,14 +28,6 @@ type block =
 type variable = string * primitive_value
 [@@deriving show, yojson {strict= false}]
 
-type costume =
-  { asset_id: string
-  ; name: string
-  ; bitmap_resolution: int option
-  ; rotation_center_x: int
-  ; rotation_center_y: int }
-[@@deriving show, yojson {strict= false}]
-
 type target =
   { is_stage: bool
   ; name: string
@@ -43,7 +35,11 @@ type target =
   ; lists: (string * primitive_value list) JsonMap.t
   ; blocks: block JsonMap.t
   ; current_costume: int
-  ; costumes: costume list }
+  ; costumes: Costume.t list
+  ; x: float
+  ; y: float
+  ; direction: float
+  ; rotation_style: string }
 [@@deriving show, yojson {strict= false}]
 
 type program = {targets: target list}

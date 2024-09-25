@@ -70,6 +70,12 @@ let output_type ?function_name = function
       Type Float
   | Answer ->
       Type String
+  | XPosition ->
+      Type Float
+  | YPosition ->
+      Type Float
+  | Direction ->
+      Type Float
 
 let statement_entrypoint_map f sprites =
   List.map
@@ -348,6 +354,12 @@ let rec convert_expr ?funname types e =
       Length l
   | Answer ->
       Answer
+  | XPosition ->
+      XPosition
+  | YPosition ->
+      YPosition
+  | Direction ->
+      Direction
 
 and bin_op_input_type ?funname types e1 e2 = function
   | Untyped_ast.Gt ->
@@ -423,6 +435,41 @@ let rec convert_statement ?funname types stmt =
       Say (convert message |> cast (Primitive String))
   | Ask question ->
       Ask (convert question |> cast (Primitive String))
+  | SetX x ->
+      SetX (convert x |> cast (Primitive Float))
+  | SetY y ->
+      SetY (convert y |> cast (Primitive Float))
+  | ChangeX x ->
+      ChangeX (convert x |> cast (Primitive Float))
+  | ChangeY y ->
+      ChangeY (convert y |> cast (Primitive Float))
+  | GoToXY g ->
+      GoToXY
+        { x= convert g.x |> cast (Primitive Float)
+        ; y= convert g.y |> cast (Primitive Float) }
+  | GoTo x ->
+      GoTo x
+  | TurnRight d ->
+      TurnRight (convert d |> cast (Primitive Float))
+  | TurnLeft d ->
+      TurnLeft (convert d |> cast (Primitive Float))
+  | MoveSteps steps ->
+      MoveSteps (convert steps |> cast (Primitive Float))
+  | GlideToXY g ->
+      GlideToXY
+        { x= convert g.x |> cast (Primitive Float)
+        ; y= convert g.y |> cast (Primitive Float)
+        ; duration= convert g.duration |> cast (Primitive Float) }
+  | GlideTo g ->
+      GlideTo
+        { target= g.target
+        ; duration= convert g.duration |> cast (Primitive Float) }
+  | PointTowards p ->
+      PointTowards p
+  | IfOnEdgeBounce ->
+      IfOnEdgeBounce
+  | SetRotationStyle r ->
+      SetRotationStyle r
 
 let convert_variable types n v =
   let t = var_type types n in
@@ -457,7 +504,12 @@ let convert_sprite types sprite =
         (List.map (convert_statement types))
         sprite.Untyped_ast.entry_points
   ; current_costume= sprite.Untyped_ast.current_costume
-  ; costumes= sprite.Untyped_ast.costumes }
+  ; costumes= sprite.Untyped_ast.costumes
+  ; name= sprite.Untyped_ast.name
+  ; x= sprite.Untyped_ast.x
+  ; y= sprite.Untyped_ast.y
+  ; direction= sprite.Untyped_ast.direction
+  ; rotation_style= sprite.Untyped_ast.rotation_style }
 
 let convert program =
   let types = types program in

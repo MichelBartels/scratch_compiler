@@ -21,13 +21,6 @@ let partition_targets targets =
   in
   (List.hd stages, sprites)
 
-let convert_costume (costume : Parse.costume) : Blocks.costume =
-  { asset_id= costume.asset_id
-  ; name= costume.name
-  ; bitmap_resolution= Option.value ~default:1 costume.bitmap_resolution
-  ; rotation_center_x= costume.rotation_center_x
-  ; rotation_center_y= costume.rotation_center_y }
-
 let parse_target target =
   let blocks = ref StringMap.empty in
   let rec create_block id =
@@ -151,6 +144,60 @@ let parse_target target =
               Ask {next; question= input_field_to_block inputs "QUESTION"}
           | "sensing_answer" ->
               Answer
+          | "motion_setx" ->
+              SetX {next; x= input_field_to_block inputs "X"}
+          | "motion_sety" ->
+              SetY {next; y= input_field_to_block inputs "Y"}
+          | "motion_changexby" ->
+              ChangeXBy {next; x= input_field_to_block inputs "DX"}
+          | "motion_changeyby" ->
+              ChangeYBy {next; y= input_field_to_block inputs "DY"}
+          | "motion_gotoxy" ->
+              GoToXY
+                { next
+                ; x= input_field_to_block inputs "X"
+                ; y= input_field_to_block inputs "Y" }
+          | "motion_goto" ->
+              GoTo {next; target= input_field_to_block inputs "TO"}
+          | "motion_goto_menu" ->
+              GoToMenu StringMap.(find "TO" fields |> fst)
+          | "motion_turnright" ->
+              TurnRight {next; degrees= input_field_to_block inputs "DEGREES"}
+          | "motion_turnleft" ->
+              TurnLeft {next; degrees= input_field_to_block inputs "DEGREES"}
+          | "motion_xposition" ->
+              XPosition
+          | "motion_yposition" ->
+              YPosition
+          | "motion_direction" ->
+              Direction
+          | "motion_movesteps" ->
+              MoveSteps {next; steps= input_field_to_block inputs "STEPS"}
+          | "motion_glidesecstoxy" ->
+              GlideToXY
+                { next
+                ; x= input_field_to_block inputs "X"
+                ; y= input_field_to_block inputs "Y"
+                ; duration= input_field_to_block inputs "SECS" }
+          | "motion_glideto" ->
+              GlideTo
+                { next
+                ; target= input_field_to_block inputs "TO"
+                ; duration= input_field_to_block inputs "SECS" }
+          | "motion_glideto_menu" ->
+              GlideToMenu StringMap.(find "TO" fields |> fst)
+          | "motion_pointtowards" ->
+              PointTowards {next; target= input_field_to_block inputs "TOWARDS"}
+          | "motion_pointtowards_menu" ->
+              PointTowardsMenu StringMap.(find "TOWARDS" fields |> fst)
+          | "motion_ifonedgebounce" ->
+              IfOnEdgeBounce {next}
+          | "motion_setrotationstyle" ->
+              SetRotationStyle
+                { next
+                ; style=
+                    Rotation_style.of_string
+                      (StringMap.find "STYLE" fields |> fst) }
           | opcode ->
               failwith @@ "invalid opcode: " ^ opcode
         in
@@ -185,8 +232,24 @@ let parse_target target =
     List.map (fun (id, _) -> create_block id)
     @@ StringMap.bindings target.blocks
   in
-  let costumes = List.map convert_costume target.costumes in
-  {variables; blocks; current_costume= target.current_costume; costumes}
+  { variables
+  ; blocks
+  ; current_costume= target.current_costume
+  ; costumes= target.costumes
+  ; name= target.name
+  ; x= target.x
+  ; y= target.y
+  ; direction= target.direction
+  ; rotation_style=
+      ( match target.rotation_style with
+      | "all around" ->
+          AllAround
+      | "left-right" ->
+          LeftRight
+      | "don't rotate" ->
+          DontRotate
+      | _ ->
+          failwith "invalid rotation style" ) }
 
 let convert program =
   let target, sprites = partition_targets program.targets in

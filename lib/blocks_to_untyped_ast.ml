@@ -27,6 +27,12 @@ let rec expr_of_block = function
       Untyped_ast.Length l.list
   | Answer ->
       Untyped_ast.Answer
+  | XPosition ->
+      Untyped_ast.XPosition
+  | YPosition ->
+      Untyped_ast.YPosition
+  | Direction ->
+      Untyped_ast.Direction
   | _ ->
       failwith "block is not a valid expression"
 
@@ -77,6 +83,50 @@ let rec statements_of_block parameter_mapping = function
   | Ask a ->
       Untyped_ast.Ask (expr_of_block a.question)
       :: statements_of_block_opt parameter_mapping a.next
+  | SetX x ->
+      Untyped_ast.SetX (expr_of_block x.x)
+      :: statements_of_block_opt parameter_mapping x.next
+  | SetY y ->
+      Untyped_ast.SetY (expr_of_block y.y)
+      :: statements_of_block_opt parameter_mapping y.next
+  | ChangeXBy x ->
+      Untyped_ast.ChangeX (expr_of_block x.x)
+      :: statements_of_block_opt parameter_mapping x.next
+  | ChangeYBy y ->
+      Untyped_ast.ChangeY (expr_of_block y.y)
+      :: statements_of_block_opt parameter_mapping y.next
+  | GoToXY g ->
+      Untyped_ast.GoToXY {x= expr_of_block g.x; y= expr_of_block g.y}
+      :: statements_of_block_opt parameter_mapping g.next
+  | GoTo {target= GoToMenu target; next} ->
+      Untyped_ast.GoTo target :: statements_of_block_opt parameter_mapping next
+  | TurnRight d ->
+      Untyped_ast.TurnRight (expr_of_block d.degrees)
+      :: statements_of_block_opt parameter_mapping d.next
+  | TurnLeft d ->
+      Untyped_ast.TurnLeft (expr_of_block d.degrees)
+      :: statements_of_block_opt parameter_mapping d.next
+  | MoveSteps steps ->
+      Untyped_ast.MoveSteps (expr_of_block steps.steps)
+      :: statements_of_block_opt parameter_mapping steps.next
+  | GlideToXY g ->
+      Untyped_ast.GlideToXY
+        { x= expr_of_block g.x
+        ; y= expr_of_block g.y
+        ; duration= expr_of_block g.duration }
+      :: statements_of_block_opt parameter_mapping g.next
+  | GlideTo {target= GlideToMenu target; next; duration} ->
+      Untyped_ast.GlideTo {target; duration= expr_of_block duration}
+      :: statements_of_block_opt parameter_mapping next
+  | PointTowards {target= PointTowardsMenu target; next} ->
+      Untyped_ast.PointTowards target
+      :: statements_of_block_opt parameter_mapping next
+  | IfOnEdgeBounce i ->
+      Untyped_ast.IfOnEdgeBounce
+      :: statements_of_block_opt parameter_mapping i.next
+  | SetRotationStyle r ->
+      Untyped_ast.SetRotationStyle r.style
+      :: statements_of_block_opt parameter_mapping r.next
   | block ->
       failwith @@ "block is not a valid statement" ^ show_block block
 
@@ -135,7 +185,12 @@ let convert_sprite sprite =
     ; variables= sprite.variables
     ; entry_points= create_entrypoints global_parameter_mapping sprite
     ; current_costume= sprite.current_costume
-    ; costumes= sprite.costumes }
+    ; costumes= sprite.costumes
+    ; name= sprite.name
+    ; x= sprite.x
+    ; y= sprite.y
+    ; direction= sprite.direction
+    ; rotation_style= sprite.rotation_style }
 
 let convert (program : program) =
   Untyped_ast.

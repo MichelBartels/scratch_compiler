@@ -19,6 +19,9 @@ type expr =
   | IndexOf of string * expr
   | Length of string
   | Answer
+  | XPosition
+  | YPosition
+  | Direction
 [@@deriving show]
 
 type statement =
@@ -33,6 +36,20 @@ type statement =
   | Repeat of expr * statement list
   | Say of expr
   | Ask of expr
+  | SetX of expr
+  | SetY of expr
+  | ChangeX of expr
+  | ChangeY of expr
+  | GoToXY of {x: expr; y: expr}
+  | GoTo of string
+  | TurnRight of expr
+  | TurnLeft of expr
+  | MoveSteps of expr
+  | GlideToXY of {x: expr; y: expr; duration: expr}
+  | GlideTo of {target: string; duration: expr}
+  | PointTowards of string
+  | IfOnEdgeBounce
+  | SetRotationStyle of Rotation_style.t
 [@@deriving show]
 
 type code = statement list [@@deriving show]
@@ -44,7 +61,12 @@ type sprite =
   ; variables: Scratch_value.t Parse.JsonMap.t
   ; entry_points: code list
   ; current_costume: int
-  ; costumes: Costume.t list }
+  ; costumes: Costume.t list
+  ; name: string
+  ; x: float
+  ; y: float
+  ; direction: float
+  ; rotation_style: Rotation_style.t }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: Scratch_value.t Parse.JsonMap.t}
