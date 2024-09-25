@@ -109,7 +109,8 @@ type target =
   ; costumes: Costume.t list
   ; x: float [@default 0.]
   ; y: float [@default 0.]
-  ; direction: float [@default 90.] }
+  ; direction: float [@default 90.]
+  ; rotation_style: string [@key "rotationStyle"] [@default "don't rotate"] }
 [@@deriving show, yojson {strict= false}]
 
 type program = {targets: target list}

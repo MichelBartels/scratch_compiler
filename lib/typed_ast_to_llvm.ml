@@ -220,80 +220,125 @@ let new_sprite =
     [ Llvm.i32_type context
     ; Llvm.float_type context
     ; Llvm.float_type context
-    ; Llvm.float_type context ]
+    ; Llvm.float_type context
+    ; Llvm.i32_type context ]
     (Llvm.pointer_type context)
 
-let sprite_set_x =
-  RuntimeFunction.declare "sprite_set_x"
+let motion_set_x =
+  RuntimeFunction.declare "motion_set_x"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_set_y =
-  RuntimeFunction.declare "sprite_set_y"
+let motion_set_y =
+  RuntimeFunction.declare "motion_set_y"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_change_x =
-  RuntimeFunction.declare "sprite_change_x"
+let motion_change_x =
+  RuntimeFunction.declare "motion_change_x"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_change_y =
-  RuntimeFunction.declare "sprite_change_y"
+let motion_change_y =
+  RuntimeFunction.declare "motion_change_y"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_add_costume =
-  RuntimeFunction.declare "sprite_add_costume"
+let motion_add_costume =
+  RuntimeFunction.declare "motion_add_costume"
     [Llvm.pointer_type context; Llvm.pointer_type context]
     (Llvm.void_type context)
 
-let sprite_get_x =
-  RuntimeFunction.declare "sprite_get_x"
+let motion_get_x =
+  RuntimeFunction.declare "motion_get_x"
     [Llvm.pointer_type context]
     (Llvm.double_type context)
 
-let sprite_get_y =
-  RuntimeFunction.declare "sprite_get_y"
+let motion_get_y =
+  RuntimeFunction.declare "motion_get_y"
     [Llvm.pointer_type context]
     (Llvm.double_type context)
 
-let sprite_get_direction =
-  RuntimeFunction.declare "sprite_get_direction"
+let motion_get_direction =
+  RuntimeFunction.declare "motion_get_direction"
     [Llvm.pointer_type context]
     (Llvm.double_type context)
 
-let sprite_turn_right =
-  RuntimeFunction.declare "sprite_turn_right"
+let motion_turn_right =
+  RuntimeFunction.declare "motion_turn_right"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_turn_left =
-  RuntimeFunction.declare "sprite_turn_left"
+let motion_turn_left =
+  RuntimeFunction.declare "motion_turn_left"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_move_steps =
-  RuntimeFunction.declare "sprite_move_steps"
+let motion_move_steps =
+  RuntimeFunction.declare "motion_move_steps"
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let sprite_glide_to_xy =
-  RuntimeFunction.declare "sprite_glide_to_xy"
+let motion_glide_to_xy =
+  RuntimeFunction.declare "motion_glide_to_xy"
     [ Llvm.pointer_type context
     ; Llvm.double_type context
     ; Llvm.double_type context
     ; Llvm.double_type context ]
     (Llvm.void_type context)
 
-let sprite_point_towards_sprite =
-  RuntimeFunction.declare "sprite_point_towards_sprite"
+let motion_glide_to_sprite =
+  RuntimeFunction.declare "motion_glide_to_sprite"
+    [ Llvm.pointer_type context
+    ; Llvm.pointer_type context
+    ; Llvm.double_type context ]
+    (Llvm.void_type context)
+
+let motion_glide_to_cursor =
+  RuntimeFunction.declare "motion_glide_to_cursor"
+    [ Llvm.pointer_type context
+    ; Llvm.pointer_type context
+    ; Llvm.double_type context ]
+    (Llvm.void_type context)
+
+let motion_glide_to_random_position =
+  RuntimeFunction.declare "motion_glide_to_random_position"
+    [Llvm.pointer_type context; Llvm.double_type context]
+    (Llvm.void_type context)
+
+let motion_point_towards_sprite =
+  RuntimeFunction.declare "motion_point_towards_sprite"
     [Llvm.pointer_type context; Llvm.pointer_type context]
     (Llvm.void_type context)
 
-let sprite_point_towards_cursor =
-  RuntimeFunction.declare "sprite_point_towards_cursor"
+let motion_point_towards_cursor =
+  RuntimeFunction.declare "motion_point_towards_cursor"
     [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let motion_go_to_random_position =
+  RuntimeFunction.declare "motion_go_to_random_position"
+    [Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let motion_go_to_sprite =
+  RuntimeFunction.declare "motion_go_to_sprite"
+    [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let motion_go_to_cursor =
+  RuntimeFunction.declare "motion_go_to_cursor"
+    [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let motion_if_on_edge_bounce =
+  RuntimeFunction.declare "motion_if_on_edge_bounce"
+    [Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let motion_set_rotation_style =
+  RuntimeFunction.declare "motion_set_rotation_style"
+    [Llvm.pointer_type context; Llvm.i32_type context]
     (Llvm.void_type context)
 
 let new_scene =
@@ -465,20 +510,11 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite e =
   | Answer ->
       Llvm.build_load (Llvm.pointer_type context) answer "" builder
   | XPosition ->
-      let runtime_sprite =
-        Llvm.build_load (Llvm.pointer_type context) runtime_sprite "" builder
-      in
-      RuntimeFunction.call sprite_get_x [runtime_sprite]
+      RuntimeFunction.call motion_get_x [runtime_sprite]
   | YPosition ->
-      let runtime_sprite =
-        Llvm.build_load (Llvm.pointer_type context) runtime_sprite "" builder
-      in
-      RuntimeFunction.call sprite_get_y [runtime_sprite]
+      RuntimeFunction.call motion_get_y [runtime_sprite]
   | Direction ->
-      let runtime_sprite =
-        Llvm.build_load (Llvm.pointer_type context) runtime_sprite "" builder
-      in
-      RuntimeFunction.call sprite_get_direction [runtime_sprite]
+      RuntimeFunction.call motion_get_direction [runtime_sprite]
 
 let rec convert_statement cur_fn vars funcs answer runtime_sprite sprites scene
     stmt =
@@ -596,46 +632,84 @@ let rec convert_statement cur_fn vars funcs answer runtime_sprite sprites scene
       store
   | SetX x ->
       let x = convert_expr x in
-      RuntimeFunction.call sprite_set_x [runtime_sprite; x]
+      RuntimeFunction.call motion_set_x [runtime_sprite; x]
   | SetY y ->
       let y = convert_expr y in
-      RuntimeFunction.call sprite_set_y [runtime_sprite; y]
+      RuntimeFunction.call motion_set_y [runtime_sprite; y]
   | ChangeX x ->
       let x = convert_expr x in
-      RuntimeFunction.call sprite_change_x [runtime_sprite; x]
+      RuntimeFunction.call motion_change_x [runtime_sprite; x]
   | ChangeY y ->
       let y = convert_expr y in
-      RuntimeFunction.call sprite_change_y [runtime_sprite; y]
-  | GoTo pos ->
+      RuntimeFunction.call motion_change_y [runtime_sprite; y]
+  | GoToXY pos ->
       let x = convert_expr pos.x in
       let y = convert_expr pos.y in
-      ignore @@ RuntimeFunction.call sprite_set_x [runtime_sprite; x] ;
-      RuntimeFunction.call sprite_set_y [runtime_sprite; y]
+      ignore @@ RuntimeFunction.call motion_set_x [runtime_sprite; x] ;
+      RuntimeFunction.call motion_set_y [runtime_sprite; y]
+  | GoTo "_random_" ->
+      RuntimeFunction.call motion_go_to_random_position [runtime_sprite]
+  | GoTo "_mouse_" ->
+      let scene =
+        Llvm.build_load (Llvm.pointer_type context) scene "" builder
+      in
+      RuntimeFunction.call motion_go_to_cursor [runtime_sprite; scene]
+  | GoTo s ->
+      let sprite = Parse.StringMap.find s sprites in
+      let sprite =
+        Llvm.build_load (Llvm.pointer_type context) sprite "" builder
+      in
+      RuntimeFunction.call motion_go_to_sprite [runtime_sprite; sprite]
   | TurnRight d ->
       let d = convert_expr d in
-      RuntimeFunction.call sprite_turn_right [runtime_sprite; d]
+      RuntimeFunction.call motion_turn_right [runtime_sprite; d]
   | TurnLeft d ->
       let d = convert_expr d in
-      RuntimeFunction.call sprite_turn_left [runtime_sprite; d]
+      RuntimeFunction.call motion_turn_left [runtime_sprite; d]
   | MoveSteps steps ->
       let steps = convert_expr steps in
-      RuntimeFunction.call sprite_move_steps [runtime_sprite; steps]
+      RuntimeFunction.call motion_move_steps [runtime_sprite; steps]
   | GlideToXY g ->
       let x = convert_expr g.x in
       let y = convert_expr g.y in
       let duration = convert_expr g.duration in
-      RuntimeFunction.call sprite_glide_to_xy [runtime_sprite; x; y; duration]
+      RuntimeFunction.call motion_glide_to_xy [runtime_sprite; x; y; duration]
+  | GlideTo {target= "_random_"; duration} ->
+      let duration = convert_expr duration in
+      RuntimeFunction.call motion_glide_to_random_position
+        [runtime_sprite; duration]
+  | GlideTo {target= "_mouse_"; duration} ->
+      let scene =
+        Llvm.build_load (Llvm.pointer_type context) scene "" builder
+      in
+      let duration = convert_expr duration in
+      RuntimeFunction.call motion_glide_to_cursor
+        [runtime_sprite; scene; duration]
+  | GlideTo {target= s; duration} ->
+      let sprite = Parse.StringMap.find s sprites in
+      let sprite =
+        Llvm.build_load (Llvm.pointer_type context) sprite "" builder
+      in
+      let duration = convert_expr duration in
+      RuntimeFunction.call motion_glide_to_sprite
+        [runtime_sprite; sprite; duration]
   | PointTowards "_mouse_" ->
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
       in
-      RuntimeFunction.call sprite_point_towards_cursor [runtime_sprite; scene]
+      RuntimeFunction.call motion_point_towards_cursor [runtime_sprite; scene]
   | PointTowards s ->
       let sprite = Parse.StringMap.find s sprites in
       let sprite =
         Llvm.build_load (Llvm.pointer_type context) sprite "" builder
       in
-      RuntimeFunction.call sprite_point_towards_sprite [runtime_sprite; sprite]
+      RuntimeFunction.call motion_point_towards_sprite [runtime_sprite; sprite]
+  | IfOnEdgeBounce ->
+      RuntimeFunction.call motion_if_on_edge_bounce [runtime_sprite]
+  | SetRotationStyle style ->
+      let style = Rotation_style.to_int style in
+      let style = Llvm.const_int (Llvm.i32_type context) style in
+      RuntimeFunction.call motion_set_rotation_style [runtime_sprite; style]
 
 let convert_function scratch_f f =
   Llvm.position_at_end f builder ;
@@ -650,7 +724,7 @@ let convert_costume sprite (costume : Costume.t) =
   let x = Llvm.const_int (Llvm.i32_type context) costume.rotation_center_x in
   let y = Llvm.const_int (Llvm.i32_type context) costume.rotation_center_y in
   let costume = RuntimeFunction.call new_costume [str; x; y] in
-  RuntimeFunction.call sprite_add_costume [sprite; costume]
+  RuntimeFunction.call motion_add_costume [sprite; costume]
 
 let init_sprite (sprite : sprite) =
   let current_costume =
@@ -662,7 +736,13 @@ let init_sprite (sprite : sprite) =
   let global = Llvm.declare_global (Llvm.pointer_type context) "" llmodule in
   Llvm.set_initializer (Llvm.const_null (Llvm.pointer_type context)) global ;
   let sprite =
-    RuntimeFunction.call new_sprite [current_costume; x; y; direction]
+    RuntimeFunction.call new_sprite
+      [ current_costume
+      ; x
+      ; y
+      ; direction
+      ; Llvm.const_int (Llvm.i32_type context)
+          (Rotation_style.to_int sprite.rotation_style) ]
   in
   ignore @@ Llvm.build_store sprite global builder ;
   global
@@ -687,6 +767,9 @@ let convert_sprite answer globals scene (sprite : sprite) sprites =
        (fun name scratch_f ->
          let f = Parse.StringMap.find name functions in
          let runtime_sprite = Parse.StringMap.find sprite.name sprites in
+         let runtime_sprite =
+           Llvm.build_load (Llvm.pointer_type context) runtime_sprite "" builder
+         in
          Llvm.position_at_end f.Function.entry builder ;
          ignore
          @@ List.map

@@ -153,10 +153,14 @@ let parse_target target =
           | "motion_changeyby" ->
               ChangeYBy {next; y= input_field_to_block inputs "DY"}
           | "motion_gotoxy" ->
-              GoTo
+              GoToXY
                 { next
                 ; x= input_field_to_block inputs "X"
                 ; y= input_field_to_block inputs "Y" }
+          | "motion_goto" ->
+              GoTo {next; target= input_field_to_block inputs "TO"}
+          | "motion_goto_menu" ->
+              GoToMenu StringMap.(find "TO" fields |> fst)
           | "motion_turnright" ->
               TurnRight {next; degrees= input_field_to_block inputs "DEGREES"}
           | "motion_turnleft" ->
@@ -175,10 +179,25 @@ let parse_target target =
                 ; x= input_field_to_block inputs "X"
                 ; y= input_field_to_block inputs "Y"
                 ; duration= input_field_to_block inputs "SECS" }
+          | "motion_glideto" ->
+              GlideTo
+                { next
+                ; target= input_field_to_block inputs "TO"
+                ; duration= input_field_to_block inputs "SECS" }
+          | "motion_glideto_menu" ->
+              GlideToMenu StringMap.(find "TO" fields |> fst)
           | "motion_pointtowards" ->
               PointTowards {next; target= input_field_to_block inputs "TOWARDS"}
           | "motion_pointtowards_menu" ->
               PointTowardsMenu StringMap.(find "TOWARDS" fields |> fst)
+          | "motion_ifonedgebounce" ->
+              IfOnEdgeBounce {next}
+          | "motion_setrotationstyle" ->
+              SetRotationStyle
+                { next
+                ; style=
+                    Rotation_style.of_string
+                      (StringMap.find "STYLE" fields |> fst) }
           | opcode ->
               failwith @@ "invalid opcode: " ^ opcode
         in
@@ -220,7 +239,17 @@ let parse_target target =
   ; name= target.name
   ; x= target.x
   ; y= target.y
-  ; direction= target.direction }
+  ; direction= target.direction
+  ; rotation_style=
+      ( match target.rotation_style with
+      | "all around" ->
+          AllAround
+      | "left-right" ->
+          LeftRight
+      | "don't rotate" ->
+          DontRotate
+      | _ ->
+          failwith "invalid rotation style" ) }
 
 let convert program =
   let target, sprites = partition_targets program.targets in

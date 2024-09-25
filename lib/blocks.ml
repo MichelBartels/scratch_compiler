@@ -33,7 +33,9 @@ type block =
   | SetY of {next: block option; y: block}
   | ChangeXBy of {next: block option; x: block}
   | ChangeYBy of {next: block option; y: block}
-  | GoTo of {next: block option; x: block; y: block}
+  | GoToXY of {next: block option; x: block; y: block}
+  | GoTo of {next: block option; target: block}
+  | GoToMenu of string
   | TurnRight of {next: block option; degrees: block}
   | TurnLeft of {next: block option; degrees: block}
   | MoveSteps of {next: block option; steps: block}
@@ -41,8 +43,12 @@ type block =
   | YPosition
   | Direction
   | GlideToXY of {next: block option; x: block; y: block; duration: block}
+  | GlideTo of {next: block option; target: block; duration: block}
+  | GlideToMenu of string
   | PointTowards of {next: block option; target: block}
   | PointTowardsMenu of string
+  | IfOnEdgeBounce of {next: block option}
+  | SetRotationStyle of {next: block option; style: Rotation_style.t}
 [@@deriving show]
 
 type variables = Scratch_value.t Parse.JsonMap.t [@@deriving show]
@@ -57,7 +63,8 @@ type sprite =
   ; name: string
   ; x: float
   ; y: float
-  ; direction: float }
+  ; direction: float
+  ; rotation_style: Rotation_style.t }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: variables} [@@deriving show]

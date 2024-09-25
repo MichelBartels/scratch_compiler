@@ -30,12 +30,16 @@ type statement =
   | SetY of expr
   | ChangeX of expr
   | ChangeY of expr
-  | GoTo of {x: expr; y: expr}
+  | GoToXY of {x: expr; y: expr}
+  | GoTo of string
   | TurnRight of expr
   | TurnLeft of expr
   | MoveSteps of expr
   | GlideToXY of {x: expr; y: expr; duration: expr}
+  | GlideTo of {target: string; duration: expr}
   | PointTowards of string
+  | IfOnEdgeBounce
+  | SetRotationStyle of Rotation_style.t
 [@@deriving show]
 
 let get_type = function
@@ -94,7 +98,8 @@ type sprite =
   ; name: string
   ; x: float
   ; y: float
-  ; direction: float }
+  ; direction: float
+  ; rotation_style: Rotation_style.t }
 [@@deriving show]
 
 type program =
