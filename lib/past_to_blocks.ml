@@ -140,6 +140,61 @@ let parse_target target =
                 ; body= input_field_to_block_opt inputs "SUBSTACK" }
           | "looks_say" ->
               Say {next; message= input_field_to_block inputs "MESSAGE"}
+          | "looks_sayforsecs" ->
+              SayForSeconds
+                { next
+                ; message= input_field_to_block inputs "MESSAGE"
+                ; duration= input_field_to_block inputs "SECS" }
+          | "looks_think" ->
+              Think {next; message= input_field_to_block inputs "MESSAGE"}
+          | "looks_thinkforsecs" ->
+              ThinkForSeconds
+                { next
+                ; message= input_field_to_block inputs "MESSAGE"
+                ; duration= input_field_to_block inputs "SECS" }
+          | "looks_switchcostumeto" ->
+              SwitchCostume
+                {next; costume= input_field_to_block inputs "COSTUME"}
+          | "looks_costume" ->
+              Costume (StringMap.find "COSTUME" fields |> fst)
+          | "looks_nextcostume" ->
+              NextCostume {next}
+          | "looks_switchbackdropto" ->
+              SwitchBackdrop
+                {next; backdrop= input_field_to_block inputs "BACKDROP"}
+          | "looks_backdrops" ->
+              Backdrop (StringMap.find "BACKDROP" fields |> fst)
+          | "looks_nextbackdrop" ->
+              NextBackdrop {next}
+          | "looks_changesizeby" ->
+              ChangeSizeBy {next; size= input_field_to_block inputs "CHANGE"}
+          | "looks_show" ->
+              Show {next}
+          | "looks_hide" ->
+              Hide {next}
+          | "looks_goforwardbackwardlayers" ->
+              GoForwardBackwardLayers
+                { next
+                ; layers= input_field_to_block inputs "NUM"
+                ; direction=
+                    ( match StringMap.find "FORWARD_BACKWARD" fields |> fst with
+                    | "forward" ->
+                        Forward
+                    | "backward" ->
+                        Backward
+                    | _ ->
+                        failwith "invalid forward/backward" ) }
+          | "looks_gotofrontback" ->
+              GoToFrontBack
+                { next
+                ; front_back=
+                    ( match StringMap.find "FRONT_BACK" fields |> fst with
+                    | "front" ->
+                        Forward
+                    | "back" ->
+                        Backward
+                    | _ ->
+                        failwith "invalid front/back" ) }
           | "sensing_askandwait" ->
               Ask {next; question= input_field_to_block inputs "QUESTION"}
           | "sensing_answer" ->
@@ -249,10 +304,13 @@ let parse_target target =
       | "don't rotate" ->
           DontRotate
       | _ ->
-          failwith "invalid rotation style" ) }
+          failwith "invalid rotation style" )
+  ; is_stage= target.is_stage }
 
 let convert program =
-  let target, sprites = partition_targets program.targets in
-  let globals = get_variables target in
+  let stage, sprites = partition_targets program.targets in
+  let globals = get_variables stage in
+  let stage = {stage with variables= StringMap.empty} in
+  let sprites = stage :: sprites in
   let sprites = List.map parse_target sprites in
   {globals; sprites}

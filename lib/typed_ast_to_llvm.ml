@@ -1,4 +1,5 @@
 open Typed_ast
+open Stdlib
 
 let context = Llvm.create_context ()
 
@@ -61,9 +62,77 @@ let alloc_string =
     [Llvm.pointer_type context]
     (Llvm.pointer_type context)
 
-let say =
-  RuntimeFunction.declare "say"
+let looks_say =
+  RuntimeFunction.declare "looks_say"
+    [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_say_for_seconds =
+  RuntimeFunction.declare "looks_say_for_seconds"
+    [ Llvm.pointer_type context
+    ; Llvm.pointer_type context
+    ; Llvm.double_type context ]
+    (Llvm.void_type context)
+
+let looks_think =
+  RuntimeFunction.declare "looks_think"
+    [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_think_for_seconds =
+  RuntimeFunction.declare "looks_think_for_seconds"
+    [ Llvm.pointer_type context
+    ; Llvm.pointer_type context
+    ; Llvm.double_type context ]
+    (Llvm.void_type context)
+
+let looks_switch_costume =
+  RuntimeFunction.declare "looks_switch_costume"
+    [Llvm.pointer_type context; Llvm.i32_type context]
+    (Llvm.void_type context)
+
+let looks_next_costume =
+  RuntimeFunction.declare "looks_next_costume"
     [Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_change_size_by =
+  RuntimeFunction.declare "looks_change_size_by"
+    [Llvm.pointer_type context; Llvm.double_type context]
+    (Llvm.void_type context)
+
+let looks_show =
+  RuntimeFunction.declare "looks_show"
+    [Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_hide =
+  RuntimeFunction.declare "looks_hide"
+    [Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_go_to_front =
+  RuntimeFunction.declare "looks_go_to_front"
+    [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_go_to_back =
+  RuntimeFunction.declare "looks_go_to_back"
+    [Llvm.pointer_type context; Llvm.pointer_type context]
+    (Llvm.void_type context)
+
+let looks_go_back_layers_by =
+  RuntimeFunction.declare "looks_go_back_layers_by"
+    [ Llvm.pointer_type context
+    ; Llvm.pointer_type context
+    ; Llvm.double_type context ]
+    (Llvm.void_type context)
+
+let looks_go_forward_layers_by =
+  RuntimeFunction.declare "looks_go_forward_layers_by"
+    [ Llvm.pointer_type context
+    ; Llvm.pointer_type context
+    ; Llvm.double_type context ]
     (Llvm.void_type context)
 
 let ask =
@@ -244,10 +313,10 @@ let motion_change_y =
     [Llvm.pointer_type context; Llvm.double_type context]
     (Llvm.void_type context)
 
-let motion_add_costume =
-  RuntimeFunction.declare "motion_add_costume"
+let sprite_add_costume =
+  RuntimeFunction.declare "sprite_add_costume"
     [Llvm.pointer_type context; Llvm.pointer_type context]
-    (Llvm.void_type context)
+    (Llvm.i32_type context)
 
 let motion_get_x =
   RuntimeFunction.declare "motion_get_x"
@@ -516,11 +585,12 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite e =
   | Direction ->
       RuntimeFunction.call motion_get_direction [runtime_sprite]
 
-let rec convert_statement cur_fn vars funcs answer runtime_sprite sprites scene
-    stmt =
+let rec convert_statement cur_fn vars funcs answer runtime_sprite runtime_stage
+    sprites scene stmt =
   let convert_expr = convert_expr cur_fn vars funcs answer runtime_sprite in
   let convert_statement =
-    convert_statement cur_fn vars funcs answer runtime_sprite sprites scene
+    convert_statement cur_fn vars funcs answer runtime_sprite runtime_stage
+      sprites scene
   in
   match stmt with
   | FuncCall (name, args) ->
@@ -624,7 +694,56 @@ let rec convert_statement cur_fn vars funcs answer runtime_sprite sprites scene
       Llvm.position_at_end next_block builder ;
       branch
   | Say e ->
-      RuntimeFunction.call say [convert_expr e]
+      RuntimeFunction.call looks_say [runtime_sprite; convert_expr e]
+  | SayForSeconds s ->
+      let msg = convert_expr s.message in
+      let duration = convert_expr s.duration in
+      RuntimeFunction.call looks_say_for_seconds [runtime_sprite; msg; duration]
+  | Think e ->
+      RuntimeFunction.call looks_think [runtime_sprite; convert_expr e]
+  | ThinkForSeconds s ->
+      let msg = convert_expr s.message in
+      let duration = convert_expr s.duration in
+      RuntimeFunction.call looks_think_for_seconds
+        [runtime_sprite; msg; duration]
+  | SwitchCostume c ->
+      let c = Llvm.const_int (Llvm.i32_type context) c in
+      RuntimeFunction.call looks_switch_costume [runtime_sprite; c]
+  | NextCostume ->
+      RuntimeFunction.call looks_next_costume [runtime_sprite]
+  | SwitchBackdrop b ->
+      let b = Llvm.const_int (Llvm.i32_type context) b in
+      RuntimeFunction.call looks_switch_costume [runtime_stage; b]
+  | NextBackdrop ->
+      RuntimeFunction.call looks_next_costume [runtime_stage]
+  | ChangeSizeBy s ->
+      let s = convert_expr s in
+      RuntimeFunction.call looks_change_size_by [runtime_sprite; s]
+  | Show ->
+      RuntimeFunction.call looks_show [runtime_sprite]
+  | Hide ->
+      RuntimeFunction.call looks_hide [runtime_sprite]
+  | GoForwardBackwardLayers (n, dir) ->
+      let n = convert_expr n in
+      let scene =
+        Llvm.build_load (Llvm.pointer_type context) scene "" builder
+      in
+      ( match dir with
+      | Forward ->
+          RuntimeFunction.call looks_go_forward_layers_by
+      | Backward ->
+          RuntimeFunction.call looks_go_back_layers_by )
+        [runtime_sprite; scene; n]
+  | GoToFrontBack dir ->
+      let scene =
+        Llvm.build_load (Llvm.pointer_type context) scene "" builder
+      in
+      ( match dir with
+      | Forward ->
+          RuntimeFunction.call looks_go_to_front
+      | Backward ->
+          RuntimeFunction.call looks_go_to_back )
+        [runtime_sprite; scene]
   | Ask e ->
       let question = convert_expr e in
       let result = RuntimeFunction.call ask [question] in
@@ -724,7 +843,7 @@ let convert_costume sprite (costume : Costume.t) =
   let x = Llvm.const_int (Llvm.i32_type context) costume.rotation_center_x in
   let y = Llvm.const_int (Llvm.i32_type context) costume.rotation_center_y in
   let costume = RuntimeFunction.call new_costume [str; x; y] in
-  RuntimeFunction.call motion_add_costume [sprite; costume]
+  RuntimeFunction.call sprite_add_costume [sprite; costume]
 
 let init_sprite (sprite : sprite) =
   let current_costume =
@@ -747,7 +866,8 @@ let init_sprite (sprite : sprite) =
   ignore @@ Llvm.build_store sprite global builder ;
   global
 
-let convert_sprite answer globals scene (sprite : sprite) sprites =
+let convert_sprite answer globals scene (sprite : sprite) sprites runtime_stage
+    =
   let functions = Parse.StringMap.map Function.declare sprite.functions in
   let vars = Parse.StringMap.map init_variable sprite.variables in
   let vars =
@@ -773,8 +893,8 @@ let convert_sprite answer globals scene (sprite : sprite) sprites =
          Llvm.position_at_end f.Function.entry builder ;
          ignore
          @@ List.map
-              (convert_statement f vars functions answer runtime_sprite sprites
-                 scene )
+              (convert_statement f vars functions answer runtime_sprite
+                 runtime_stage sprites scene )
               scratch_f.code ;
          Llvm.build_ret_void builder )
        sprite.functions ;
@@ -787,10 +907,13 @@ let convert_sprite answer globals scene (sprite : sprite) sprites =
         let runtime_sprite =
           Llvm.build_load (Llvm.pointer_type context) runtime_sprite "" builder
         in
+        let runtime_stage =
+          Llvm.build_load (Llvm.pointer_type context) runtime_stage "" builder
+        in
         ignore
         @@ List.map
-             (convert_statement f vars functions answer runtime_sprite sprites
-                scene )
+             (convert_statement f vars functions answer runtime_sprite
+                runtime_stage sprites scene )
              code ;
         ignore @@ Llvm.build_ret_void builder ;
         f )
@@ -820,11 +943,19 @@ let convert (p : Typed_ast.program) =
     List.map (fun sprite -> (sprite.name, init_sprite sprite)) p.sprites
     |> Parse.StringMap.of_list
   in
+  let stage_name =
+    List.find_map
+      (fun sprite -> if sprite.is_stage then Some sprite.name else None)
+      p.sprites
+    |> Option.get
+  in
+  let runtime_stage = Parse.StringMap.find stage_name runtime_sprites in
   let sprites =
     List.map
       (fun sprite ->
         Llvm.position_at_end entry builder ;
-        convert_sprite answer globals global_scene sprite runtime_sprites )
+        convert_sprite answer globals global_scene sprite runtime_sprites
+          runtime_stage )
       p.sprites
   in
   Llvm.position_at_end entry builder ;

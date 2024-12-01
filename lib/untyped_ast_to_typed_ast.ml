@@ -433,6 +433,34 @@ let rec convert_statement ?funname types stmt =
         (convert cond |> cast (Primitive Float), List.map convert_statement body)
   | Say message ->
       Say (convert message |> cast (Primitive String))
+  | SayForSeconds s ->
+      SayForSeconds
+        { message= convert s.message |> cast (Primitive String)
+        ; duration= convert s.duration |> cast (Primitive Float) }
+  | Think message ->
+      Think (convert message |> cast (Primitive String))
+  | ThinkForSeconds s ->
+      ThinkForSeconds
+        { message= convert s.message |> cast (Primitive String)
+        ; duration= convert s.duration |> cast (Primitive Float) }
+  | SwitchCostume c ->
+      SwitchCostume c
+  | NextCostume ->
+      NextCostume
+  | SwitchBackdrop b ->
+      SwitchBackdrop b
+  | NextBackdrop ->
+      NextBackdrop
+  | ChangeSizeBy s ->
+      ChangeSizeBy (convert s |> cast (Primitive Float))
+  | Show ->
+      Show
+  | Hide ->
+      Hide
+  | GoForwardBackwardLayers (l, d) ->
+      GoForwardBackwardLayers (convert l |> cast (Primitive Float), d)
+  | GoToFrontBack l ->
+      GoToFrontBack l
   | Ask question ->
       Ask (convert question |> cast (Primitive String))
   | SetX x ->
@@ -509,7 +537,8 @@ let convert_sprite types sprite =
   ; x= sprite.Untyped_ast.x
   ; y= sprite.Untyped_ast.y
   ; direction= sprite.Untyped_ast.direction
-  ; rotation_style= sprite.Untyped_ast.rotation_style }
+  ; rotation_style= sprite.Untyped_ast.rotation_style
+  ; is_stage= sprite.Untyped_ast.is_stage }
 
 let convert program =
   let types = types program in

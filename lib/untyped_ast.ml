@@ -35,6 +35,18 @@ type statement =
   | WhileNot of expr * statement list
   | Repeat of expr * statement list
   | Say of expr
+  | SayForSeconds of {message: expr; duration: expr}
+  | Think of expr
+  | ThinkForSeconds of {message: expr; duration: expr}
+  | SwitchCostume of int
+  | NextCostume
+  | SwitchBackdrop of int
+  | NextBackdrop
+  | ChangeSizeBy of expr
+  | Show
+  | Hide
+  | GoForwardBackwardLayers of expr * Layer_direction.t
+  | GoToFrontBack of Layer_direction.t
   | Ask of expr
   | SetX of expr
   | SetY of expr
@@ -66,7 +78,8 @@ type sprite =
   ; x: float
   ; y: float
   ; direction: float
-  ; rotation_style: Rotation_style.t }
+  ; rotation_style: Rotation_style.t
+  ; is_stage: bool }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: Scratch_value.t Parse.JsonMap.t}

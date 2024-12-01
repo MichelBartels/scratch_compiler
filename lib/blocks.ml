@@ -27,6 +27,21 @@ type block =
   | RepeatUntil of {next: block option; condition: block; body: block option}
   | Repeat of {next: block option; count: block; body: block option}
   | Say of {next: block option; message: block}
+  | SayForSeconds of {next: block option; message: block; duration: block}
+  | Think of {next: block option; message: block}
+  | ThinkForSeconds of {next: block option; message: block; duration: block}
+  | SwitchCostume of {next: block option; costume: block}
+  | Costume of string
+  | NextCostume of {next: block option}
+  | SwitchBackdrop of {next: block option; backdrop: block}
+  | Backdrop of string
+  | NextBackdrop of {next: block option}
+  | ChangeSizeBy of {next: block option; size: block}
+  | Show of {next: block option}
+  | Hide of {next: block option}
+  | GoForwardBackwardLayers of
+      {next: block option; layers: block; direction: Layer_direction.t}
+  | GoToFrontBack of {next: block option; front_back: Layer_direction.t}
   | Ask of {next: block option; question: block}
   | Answer
   | SetX of {next: block option; x: block}
@@ -53,18 +68,17 @@ type block =
 
 type variables = Scratch_value.t Parse.JsonMap.t [@@deriving show]
 
-type costume = Costume.t [@@deriving show]
-
 type sprite =
   { variables: variables
   ; blocks: block list
   ; current_costume: int
-  ; costumes: costume list
+  ; costumes: Costume.t list
   ; name: string
   ; x: float
   ; y: float
   ; direction: float
-  ; rotation_style: Rotation_style.t }
+  ; rotation_style: Rotation_style.t
+  ; is_stage: bool }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: variables} [@@deriving show]
