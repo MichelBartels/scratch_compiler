@@ -9,7 +9,8 @@ type expr =
   | Not of expr
   | Index of string * expr * Scratch_type.t
   | IndexOf of string * expr
-  | Length of string
+  | ListLength of string
+  | StringLength of expr
   | Contains of {list: string; item: expr}
   | Answer
   | XPosition
@@ -32,13 +33,14 @@ type statement =
   | SetIndex of string * expr * expr
   | WhileNot of expr * statement list
   | Repeat of expr * statement list
+  | Forever of statement list
   | Say of expr
   | SayForSeconds of {message: expr; duration: expr}
   | Think of expr
   | ThinkForSeconds of {message: expr; duration: expr}
   | SwitchCostume of expr
   | NextCostume
-  | SwitchBackdrop of int
+  | SwitchBackdrop of expr
   | NextBackdrop
   | ChangeSizeBy of expr
   | Show
@@ -108,7 +110,9 @@ let get_type = function
       t
   | IndexOf _ ->
       Primitive Float
-  | Length _ ->
+  | ListLength _ ->
+      Primitive Float
+  | StringLength _ ->
       Primitive Float
   | Contains _ ->
       Primitive Boolean

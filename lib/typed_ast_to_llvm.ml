@@ -128,7 +128,7 @@ let looks_think_for_seconds =
 
 let looks_switch_costume =
   RuntimeFunction.declare "looks_switch_costume"
-    [Llvm.pointer_type context; Llvm.i32_type context]
+    [Llvm.pointer_type context; Llvm.pointer_type context]
     (Llvm.void_type context)
 
 let looks_next_costume =
@@ -182,23 +182,13 @@ let looks_costume_number_of =
 
 let looks_costume_name_of =
   RuntimeFunction.declare "looks_costume_name_of"
-    [Llvm.pointer_type context; Llvm.double_type context]
+    [Llvm.pointer_type context]
     (Llvm.pointer_type context)
 
 let ask =
   RuntimeFunction.declare "ask"
     [Llvm.pointer_type context]
     (Llvm.pointer_type context)
-
-let cast_double_to_string =
-  RuntimeFunction.declare "cast_f64_to_string"
-    [Llvm.double_type context]
-    (Llvm.pointer_type context)
-
-let cast_string_to_double =
-  RuntimeFunction.declare "cast_string_to_f64"
-    [Llvm.pointer_type context]
-    (Llvm.double_type context)
 
 let join =
   RuntimeFunction.declare "join"
@@ -364,6 +354,16 @@ let cast_f64_to_bool =
     [Llvm.double_type context]
     (Llvm.i1_type context)
 
+let cast_double_to_string =
+  RuntimeFunction.declare "cast_f64_to_string"
+    [Llvm.double_type context]
+    (Llvm.pointer_type context)
+
+let cast_string_to_double =
+  RuntimeFunction.declare "cast_string_to_f64"
+    [Llvm.pointer_type context]
+    (Llvm.double_type context)
+
 let string_vec_contains =
   RuntimeFunction.declare "string_vec_contains"
     [Llvm.pointer_type context; Llvm.pointer_type context]
@@ -394,9 +394,18 @@ let warn =
     [Llvm.pointer_type context]
     (Llvm.void_type context)
 
-let new_costume =
-  RuntimeFunction.declare "new_costume"
+let new_svg_costume =
+  RuntimeFunction.declare "new_svg_costume"
     [ Llvm.pointer_type context
+    ; Llvm.float_type context
+    ; Llvm.float_type context
+    ; Llvm.pointer_type context ]
+    (Llvm.pointer_type context)
+
+let new_png_costume =
+  RuntimeFunction.declare "new_png_costume"
+    [ Llvm.pointer_type context
+    ; Llvm.i32_type context
     ; Llvm.float_type context
     ; Llvm.float_type context
     ; Llvm.pointer_type context ]
@@ -678,9 +687,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage e =
         | Sqrt ->
             operator_sqrt
         | Round ->
-            operator_round
-        | Length ->
-            operator_length )
+            operator_round )
         [e]
   | Random r ->
       let e1 = convert_expr r.min in
@@ -711,7 +718,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage e =
           RuntimeFunction.call index_of_string [list; value]
       | Boolean ->
           RuntimeFunction.call index_of_bool [list; value] )
-  | Length l -> (
+  | ListLength l -> (
       let list_type, list = Parse.StringMap.find l vars in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       match list_type with
@@ -721,6 +728,9 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage e =
           RuntimeFunction.call len_of_string_vec [list]
       | Boolean ->
           RuntimeFunction.call len_of_bool_vec [list] )
+  | StringLength e ->
+      let e = convert_expr e in
+      RuntimeFunction.call operator_length [e]
   | Contains c -> (
       let list_type, list = Parse.StringMap.find c.list vars in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
@@ -732,23 +742,31 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage e =
           RuntimeFunction.call string_vec_contains [list; item]
       | Boolean ->
           RuntimeFunction.call bool_vec_contains [list; item] )
-  | Cast (e, to_type) -> (
+  | Cast (e, to_type) ->
       let from_type = Typed_ast.get_type e in
-      match (from_type, to_type) with
-      | Primitive Float, Primitive String ->
-          RuntimeFunction.call cast_double_to_string [convert_expr e]
-      | Primitive String, Primitive Float ->
-          RuntimeFunction.call cast_string_to_double [convert_expr e]
-      | Primitive Boolean, Primitive String ->
-          RuntimeFunction.call cast_bool_to_string [convert_expr e]
-      | Primitive String, Primitive Boolean ->
-          RuntimeFunction.call cast_string_to_bool [convert_expr e]
-      | Primitive Float, Primitive Boolean ->
-          RuntimeFunction.call cast_f64_to_bool [convert_expr e]
-      | Primitive Boolean, Primitive Float ->
-          RuntimeFunction.call cast_bool_to_f64 [convert_expr e]
-      | _ ->
-          failwith "Unsupported cast" )
+      RuntimeFunction.call
+        ( match (from_type, to_type) with
+        | Primitive Float, Primitive String ->
+            cast_double_to_string
+        | Primitive String, Primitive Float ->
+            cast_string_to_double
+        | Primitive Boolean, Primitive String ->
+            cast_bool_to_string
+        | Primitive String, Primitive Boolean ->
+            cast_string_to_bool
+        | Primitive Float, Primitive Boolean ->
+            cast_f64_to_bool
+        | Primitive Boolean, Primitive Float ->
+            cast_bool_to_f64
+        | List Float, Primitive String ->
+            cast_f64_vec_to_string
+        | List String, Primitive String ->
+            cast_string_vec_to_string
+        | List Boolean, Primitive String ->
+            cast_bool_vec_to_string
+        | _ ->
+            failwith "Unsupported cast" )
+        [convert_expr e]
   | Answer ->
       Llvm.build_load (Llvm.pointer_type context) answer "" builder
   | XPosition ->
@@ -876,6 +894,15 @@ let rec convert_statement cur_fn vars funcs answer runtime_sprite runtime_stage
       ignore @@ Llvm.build_br cond_block builder ;
       Llvm.position_at_end next_block builder ;
       branch
+  | Forever body ->
+      let loop = Llvm.append_block context "" cur_fn.f in
+      let next_block = Llvm.append_block context "" cur_fn.f in
+      ignore @@ Llvm.build_br loop builder ;
+      Llvm.position_at_end loop builder ;
+      ignore @@ List.map convert_statement body ;
+      ignore @@ Llvm.build_br loop builder ;
+      Llvm.position_at_end next_block builder ;
+      Llvm.build_br loop builder
   | Say e ->
       RuntimeFunction.call looks_say [runtime_sprite; convert_expr e]
   | SayForSeconds s ->
@@ -895,7 +922,7 @@ let rec convert_statement cur_fn vars funcs answer runtime_sprite runtime_stage
   | NextCostume ->
       RuntimeFunction.call looks_next_costume [runtime_sprite]
   | SwitchBackdrop b ->
-      let b = Llvm.const_int (Llvm.i32_type context) b in
+      let b = convert_expr b in
       RuntimeFunction.call looks_switch_costume [runtime_stage; b]
   | NextBackdrop ->
       RuntimeFunction.call looks_next_costume [runtime_stage]
@@ -1020,12 +1047,34 @@ let convert_function scratch_f f =
   Llvm.position_at_end f builder ;
   convert_statement scratch_f
 
+let load_file path =
+  if Sys.file_exists path then (
+    let ch = open_in_bin path in
+    let len = in_channel_length ch in
+    let str = really_input_string ch len in
+    let str = Llvm.const_string context str in
+    let str_ptr = Llvm.define_global "" str llmodule in
+    close_in ch ;
+    Some (len, str_ptr) )
+  else None
+
+let load_svg asset_id = load_file @@ "example_code/" ^ asset_id ^ ".svg"
+
+let load_png asset_id = load_file @@ "example_code/" ^ asset_id ^ ".png"
+
+let load_picture asset_id =
+  match load_svg asset_id with
+  | Some (_, svg) ->
+      `SVG svg
+  | None -> (
+    match load_png asset_id with
+    | Some (len, png) ->
+        `PNG (len, png)
+    | None ->
+        failwith @@ "No asset found for " ^ asset_id )
+
 let convert_costume sprite (costume : Costume.t) =
-  let path = "example_code/" ^ costume.asset_id ^ ".svg" in
-  let ch = open_in_bin path in
-  let str = really_input_string ch (in_channel_length ch) in
-  close_in ch ;
-  let str = Llvm.build_global_stringptr str "" builder in
+  let img = load_picture costume.asset_id in
   let x =
     Llvm.const_float (Llvm.float_type context) costume.rotation_center_x
   in
@@ -1033,7 +1082,14 @@ let convert_costume sprite (costume : Costume.t) =
     Llvm.const_float (Llvm.float_type context) costume.rotation_center_y
   in
   let name = Llvm.build_global_stringptr costume.name "" builder in
-  let costume = RuntimeFunction.call new_costume [str; x; y; name] in
+  let costume =
+    match img with
+    | `SVG svg ->
+        RuntimeFunction.call new_svg_costume [svg; x; y; name]
+    | `PNG (len, png) ->
+        let len = Llvm.const_int (Llvm.i32_type context) len in
+        RuntimeFunction.call new_png_costume [png; len; x; y; name]
+  in
   RuntimeFunction.call sprite_add_costume [sprite; costume]
 
 let init_sprite (sprite : sprite) =
@@ -1063,7 +1119,10 @@ let convert_sprite answer globals scene (sprite : sprite) sprites runtime_stage
   let vars = Parse.StringMap.map init_variable sprite.variables in
   let vars =
     Parse.StringMap.union
-      (fun str -> failwith @@ "collision: " ^ str)
+      (fun str ->
+        failwith @@ "two variables with id " ^ str ^ " in sprite " ^ sprite.name
+        ^ " with is_stage= "
+        ^ if sprite.is_stage then "true" else "false" )
       vars globals
   in
   let runtime_sprite = Parse.StringMap.find sprite.name sprites in
@@ -1080,10 +1139,13 @@ let convert_sprite answer globals scene (sprite : sprite) sprites runtime_stage
        (fun name scratch_f ->
          let f = Parse.StringMap.find name functions in
          let runtime_sprite = Parse.StringMap.find sprite.name sprites in
+         Llvm.position_at_end f.Function.entry builder ;
          let runtime_sprite =
            Llvm.build_load (Llvm.pointer_type context) runtime_sprite "" builder
          in
-         Llvm.position_at_end f.Function.entry builder ;
+         let runtime_stage =
+           Llvm.build_load (Llvm.pointer_type context) runtime_stage "" builder
+         in
          ignore
          @@ List.map
               (convert_statement f vars functions answer runtime_sprite

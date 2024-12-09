@@ -8,8 +8,8 @@ let get_arg_name = function
       failwith @@ "could not find argument by arg id, got block: "
       ^ show_block block
 
-let rec expr_of_block costumes block =
-  let expr_of_block = expr_of_block costumes in
+let rec expr_of_block costumes backdrops block =
+  let expr_of_block = expr_of_block costumes backdrops in
   match block with
   | Constant c ->
       Untyped_ast.Literal (Scratch_value.Primitive c)
@@ -33,7 +33,9 @@ let rec expr_of_block costumes block =
   | ItemOfList i ->
       Untyped_ast.Index (i.list, expr_of_block i.index)
   | LengthOfList l ->
-      Untyped_ast.Length l.list
+      Untyped_ast.ListLength l.list
+  | LengthOfString s ->
+      Untyped_ast.StringLength (expr_of_block s.string)
   | ListContainsItem l ->
       Untyped_ast.Contains {list= l.list; item= expr_of_block l.item}
   | Answer ->
@@ -59,6 +61,13 @@ let rec expr_of_block costumes block =
               (string_of_int
                  ( List.find_index (fun (x : Costume.t) -> x.name = c) costumes
                  |> Option.get ) ) ) )
+  | Backdrop b ->
+      Literal
+        (Primitive
+           (String
+              (string_of_int
+                 ( List.find_index (fun (x : Costume.t) -> x.name = b) backdrops
+                 |> Option.get ) ) ) )
   | Warn w ->
       failwith @@ "warn is not a valid expression: " ^ w.message
   | block ->
@@ -66,7 +75,7 @@ let rec expr_of_block costumes block =
 
 let rec statements_of_block parameter_mapping costumes backdrops block =
   let next = statements_of_block_opt parameter_mapping costumes backdrops in
-  let expr_of_block = expr_of_block costumes in
+  let expr_of_block = expr_of_block costumes backdrops in
   match block with
   | ProceduresCall call ->
       Untyped_ast.FuncCall
@@ -100,6 +109,8 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
       :: next r.next
   | Repeat r ->
       Untyped_ast.Repeat (expr_of_block r.count, next r.body) :: next r.next
+  | Forever f ->
+      Untyped_ast.Forever (next f.body) :: next f.next
   | Say s ->
       Untyped_ast.Say (expr_of_block s.message) :: next s.next
   | SayForSeconds s ->
@@ -116,11 +127,8 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
       Untyped_ast.SwitchCostume (expr_of_block c) :: next next'
   | NextCostume n ->
       Untyped_ast.NextCostume :: next n.next
-  | SwitchBackdrop {next= next'; backdrop= Backdrop b} ->
-      Untyped_ast.SwitchBackdrop
-        ( List.find_index (fun (x : Costume.t) -> x.name = b) backdrops
-        |> Option.get )
-      :: next next'
+  | SwitchBackdrop {next= next'; backdrop= b} ->
+      Untyped_ast.SwitchBackdrop (expr_of_block b) :: next next'
   | NextBackdrop n ->
       Untyped_ast.NextBackdrop :: next n.next
   | ChangeSizeBy c ->

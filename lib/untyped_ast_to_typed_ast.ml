@@ -12,8 +12,8 @@ module InferredTypeSet = Set.Make (struct
   let compare = compare
 end)
 
-let show_inferred_type_set s =
-  InferredTypeSet.fold (fun x acc -> show_inferred_type x ^ ", " ^ acc) s ""
+(* let show_inferred_type_set s = *)
+(*   InferredTypeSet.fold (fun x acc -> show_inferred_type x ^ ", " ^ acc) s "" *)
 
 module StringSet = Set.Make (String)
 
@@ -82,7 +82,9 @@ let output_type ?function_name = function
       Variable l
   | IndexOf _ ->
       Type Float
-  | Length _ ->
+  | ListLength _ ->
+      Type Float
+  | StringLength _ ->
       Type Float
   | Contains _ ->
       Type Boolean
@@ -193,7 +195,6 @@ let find_args e =
       let _ = function_name in
       function
       | FuncCall (name, args) ->
-          print_endline @@ "args: " ^ name ;
           Parse.StringMap.bindings args
           |> List.map (fun (arg, _) -> (name, arg))
       | _ ->
@@ -301,27 +302,25 @@ let unify_arguments =
     (fun x -> x.argument_types)
     (fun (fname, argname) -> Argument (fname, argname))
 
-let show_argument_types args =
-  let args =
-    List.map
-      (fun ((k1, k2), v) ->
-        "(" ^ k1 ^ "," ^ k2 ^ ")" ^ ": " ^ show_inferred_type_set v )
-      args
-    |> String.concat ", "
-  in
-  "[" ^ args ^ "]"
+(* let show_argument_types args = *)
+(*   let args = *)
+(*     List.map *)
+(*       (fun ((k1, k2), v) -> *)
+(*         "(" ^ k1 ^ "," ^ k2 ^ ")" ^ ": " ^ show_inferred_type_set v ) *)
+(*       args *)
+(*     |> String.concat ", " *)
+(*   in *)
+(*   "[" ^ args ^ "]" *)
 
-let show_variable_types vars =
-  let vars =
-    List.map (fun (k, v) -> k ^ ": " ^ show_inferred_type_set v) vars
-    |> String.concat ", "
-  in
-  "[" ^ vars ^ "]"
+(* let show_variable_types vars = *)
+(*   let vars = *)
+(*     List.map (fun (k, v) -> k ^ ": " ^ show_inferred_type_set v) vars *)
+(*     |> String.concat ", " *)
+(*   in *)
+(*   "[" ^ vars ^ "]" *)
 
 let types program =
   let result = program |> infer_types |> unify_variables |> unify_arguments in
-  print_endline @@ "arg types: " ^ show_argument_types result.argument_types ;
-  print_endline @@ "var types: " ^ show_variable_types result.variable_types ;
   result
 
 let reduce_to_single_type t =
@@ -338,18 +337,13 @@ let var_type types var =
   | Some t ->
       reduce_to_single_type t
   | None ->
-      print_endline @@ "no type inferred for variable: " ^ var
-      ^ " falling back to string" ;
       Scratch_type.String
 
 let arg_type types (f, a) =
-  print_endline @@ "searching for: " ^ a ^ " in " ^ f ;
   match Assoc_list.search (f, a) types.argument_types with
   | Some t ->
       reduce_to_single_type t
   | None ->
-      print_endline @@ "no type inferred for list: (" ^ f ^ ", " ^ a
-      ^ ") falling back to string" ;
       Scratch_type.String
 
 let rec convert_expr ?funname types e =
@@ -388,8 +382,10 @@ let rec convert_expr ?funname types e =
         (name, convert i |> cast (Primitive Float), Primitive (var_type name))
   | IndexOf (name, e) ->
       IndexOf (name, convert e |> cast (Primitive (var_type name)))
-  | Length l ->
-      Length l
+  | ListLength l ->
+      ListLength l
+  | StringLength s ->
+      StringLength (convert s |> cast (Primitive String))
   | Contains c ->
       Contains
         { list= c.list
@@ -491,6 +487,8 @@ let rec convert_statement ?funname types stmt =
   | Repeat (cond, body) ->
       Repeat
         (convert cond |> cast (Primitive Float), List.map convert_statement body)
+  | Forever body ->
+      Forever (List.map convert_statement body)
   | Say message ->
       Say (convert message |> cast (Primitive String))
   | SayForSeconds s ->
@@ -508,7 +506,7 @@ let rec convert_statement ?funname types stmt =
   | NextCostume ->
       NextCostume
   | SwitchBackdrop b ->
-      SwitchBackdrop b
+      SwitchBackdrop (convert b |> cast (Primitive String))
   | NextBackdrop ->
       NextBackdrop
   | ChangeSizeBy s ->

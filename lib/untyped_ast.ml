@@ -14,8 +14,7 @@ type binary_operator =
   | Mod
 [@@deriving show]
 
-type unary_math_operator = Abs | Floor | Ceil | Sqrt | Round | Length
-[@@deriving show]
+type unary_math_operator = Abs | Floor | Ceil | Sqrt | Round [@@deriving show]
 
 type expr =
   | Argument of string
@@ -28,7 +27,8 @@ type expr =
   | Not of expr
   | Index of string * expr
   | IndexOf of string * expr
-  | Length of string
+  | StringLength of expr
+  | ListLength of string
   | Contains of {list: string; item: expr}
   | Answer
   | XPosition
@@ -50,13 +50,14 @@ type statement =
   | SetIndex of {list: string; index: expr; value: expr}
   | WhileNot of expr * statement list
   | Repeat of expr * statement list
+  | Forever of statement list
   | Say of expr
   | SayForSeconds of {message: expr; duration: expr}
   | Think of expr
   | ThinkForSeconds of {message: expr; duration: expr}
   | SwitchCostume of expr
   | NextCostume
-  | SwitchBackdrop of int
+  | SwitchBackdrop of expr
   | NextBackdrop
   | ChangeSizeBy of expr
   | Show

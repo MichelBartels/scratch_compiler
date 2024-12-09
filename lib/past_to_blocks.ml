@@ -108,8 +108,7 @@ let parse_target target =
               UnaryMathOperator
                 {operator= Round; arg= input_field_to_block inputs "NUM"}
           | "operator_length" ->
-              UnaryMathOperator
-                {operator= Length; arg= input_field_to_block inputs "STRING"}
+              LengthOfString {string= input_field_to_block inputs "STRING"}
           | "procedures_call" ->
               ProceduresCall
                 { next
@@ -179,6 +178,8 @@ let parse_target target =
                 { next
                 ; count= input_field_to_block inputs "TIMES"
                 ; body= input_field_to_block_opt inputs "SUBSTACK" }
+          | "control_forever" ->
+              Forever {next; body= input_field_to_block_opt inputs "SUBSTACK"}
           | "looks_say" ->
               Say {next; message= input_field_to_block inputs "MESSAGE"}
           | "looks_sayforsecs" ->
@@ -363,7 +364,7 @@ let parse_target target =
 let convert program =
   let stage, sprites = partition_targets program.targets in
   let globals = get_variables stage in
-  let stage = {stage with variables= StringMap.empty} in
+  let stage = {stage with variables= StringMap.empty; lists= StringMap.empty} in
   let sprites = stage :: sprites in
   let sprites = List.map parse_target sprites in
   {globals; sprites}

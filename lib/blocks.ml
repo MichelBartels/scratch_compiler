@@ -27,9 +27,11 @@ type block =
   | ReplaceItemOfList of
       {next: block option; list: string; index: block; item: block}
   | LengthOfList of {list: string}
+  | LengthOfString of {string: block}
   | ListContainsItem of {list: string; item: block}
   | RepeatUntil of {next: block option; condition: block; body: block option}
   | Repeat of {next: block option; count: block; body: block option}
+  | Forever of {next: block option; body: block option}
   | Say of {next: block option; message: block}
   | SayForSeconds of {next: block option; message: block; duration: block}
   | Think of {next: block option; message: block}
