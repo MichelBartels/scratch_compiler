@@ -2,10 +2,13 @@ type block =
   | Constant of Scratch_value.primitive_value
   | Variable of string
   | Argument of {name: string}
+  | List of string
   | ProceduresDefinition of {next: block option; prototype: block}
   | ProceduresPrototype of {parameters: block Parse.JsonMap.t; proccode: string}
   | BinaryOperator of
       {operator: Untyped_ast.binary_operator; arg1: block; arg2: block}
+  | UnaryMathOperator of {operator: Untyped_ast.unary_math_operator; arg: block}
+  | Random of {min: block; max: block}
   | Not of {arg: block}
   | ProceduresCall of
       {next: block option; inputs: (string * block) list; proccode: string}
@@ -24,6 +27,7 @@ type block =
   | ReplaceItemOfList of
       {next: block option; list: string; index: block; item: block}
   | LengthOfList of {list: string}
+  | ListContainsItem of {list: string; item: block}
   | RepeatUntil of {next: block option; condition: block; body: block option}
   | Repeat of {next: block option; count: block; body: block option}
   | Say of {next: block option; message: block}
@@ -42,6 +46,10 @@ type block =
   | GoForwardBackwardLayers of
       {next: block option; layers: block; direction: Layer_direction.t}
   | GoToFrontBack of {next: block option; front_back: Layer_direction.t}
+  | CurrentCostumeNumber
+  | CurrentCostumeName
+  | CurrentBackdropNumber
+  | CurrentBackdropName
   | Ask of {next: block option; question: block}
   | Answer
   | SetX of {next: block option; x: block}
@@ -64,6 +72,7 @@ type block =
   | PointTowardsMenu of string
   | IfOnEdgeBounce of {next: block option}
   | SetRotationStyle of {next: block option; style: Rotation_style.t}
+  | Warn of {next: block option; message: string}
 [@@deriving show]
 
 type variables = Scratch_value.t Parse.JsonMap.t [@@deriving show]

@@ -57,13 +57,19 @@ type input =
   | Id of string
   | Variable of string
   | Value of Scratch_value.primitive_value
+  | Broadcast of string
+  | List of string
 [@@deriving show]
 
 type input_opt = input option [@@deriving show]
 
 let input_opt_of_yojson = function
   | `List (_ :: `List [`Int m; `String n] :: _) when m >= 4 && m <= 8 ->
-      Ok (Some (Value (Float (float_of_string n))))
+      Ok
+        (Some
+           (Value
+              (Float (float_of_string_opt n |> Stdlib.Option.value ~default:0.))
+           ) )
   | `List (_ :: `List [`Int 10; `String str] :: _) ->
       Ok
         (Some
@@ -74,18 +80,23 @@ let input_opt_of_yojson = function
                Value (String str) ) )
   | `List (_ :: `String id :: _) ->
       Ok (Some (Id id))
+  | `List (_ :: `List [`Int 11; _; `String id] :: _) ->
+      Ok (Some (Broadcast id))
   | `List (_ :: `List [`Int 12; _; `String id] :: _) ->
       Ok (Some (Variable id))
+  | `List (_ :: `List [`Int 13; _; `String id] :: _) ->
+      Ok (Some (List id))
   | `List (_ :: `Null :: _) ->
       Ok None
   | json ->
       Error
-        ( "input_of_yojson: expected `List, got instead "
+        ( "input_opt_of_yojson: expected `List, got instead "
         ^ Yojson.Safe.to_string json )
 
 let input_opt_to_yojson _ = failwith "input_to_yojson: not implemented"
 
-type mutation = {proccode: string} [@@deriving show, yojson {strict= false}]
+type mutation = {proccode: string option [@default None]}
+[@@deriving show, yojson {strict= false}]
 
 type block =
   { opcode: string

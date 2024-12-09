@@ -1,17 +1,25 @@
 type expr =
   | Argument of string * Scratch_type.t
   | Variable of string * Scratch_type.t
+  | List of string * Scratch_type.t
   | Literal of Scratch_value.t
   | BinaryOperator of Untyped_ast.binary_operator * expr * expr
+  | UnaryMathOperator of Untyped_ast.unary_math_operator * expr
+  | Random of {min: expr; max: expr}
   | Not of expr
   | Index of string * expr * Scratch_type.t
   | IndexOf of string * expr
   | Length of string
+  | Contains of {list: string; item: expr}
   | Answer
   | XPosition
   | YPosition
   | Direction
   | Cast of expr * Scratch_type.t
+  | CostumeNumber
+  | CostumeName
+  | BackdropNumber
+  | BackdropName
 [@@deriving show]
 
 type statement =
@@ -28,7 +36,7 @@ type statement =
   | SayForSeconds of {message: expr; duration: expr}
   | Think of expr
   | ThinkForSeconds of {message: expr; duration: expr}
-  | SwitchCostume of int
+  | SwitchCostume of expr
   | NextCostume
   | SwitchBackdrop of int
   | NextBackdrop
@@ -52,6 +60,7 @@ type statement =
   | PointTowards of string
   | IfOnEdgeBounce
   | SetRotationStyle of Rotation_style.t
+  | Warn of string
 [@@deriving show]
 
 let get_type = function
@@ -59,24 +68,40 @@ let get_type = function
       t
   | Variable (_, t) ->
       t
+  | List (_, t) ->
+      t
   | Literal l ->
       Scratch_value.get_type l
   | BinaryOperator (Gt, _, _) ->
       Primitive Boolean
+  | Random _ ->
+      Primitive Float
   | BinaryOperator (Lt, _, _) ->
       Primitive Boolean
   | BinaryOperator (Subtract, _, _) ->
       Primitive Float
   | BinaryOperator (Add, _, _) ->
       Primitive Float
+  | BinaryOperator (Multiply, _, _) ->
+      Primitive Float
+  | BinaryOperator (Divide, _, _) ->
+      Primitive Float
   | BinaryOperator (Equals, _, _) ->
       Primitive Boolean
   | BinaryOperator (Or, _, _) ->
+      Primitive Boolean
+  | BinaryOperator (And, _, _) ->
       Primitive Boolean
   | BinaryOperator (Join, _, _) ->
       Primitive String
   | BinaryOperator (LetterOf, _, _) ->
       Primitive String
+  | BinaryOperator (Contains, _, _) ->
+      Primitive Boolean
+  | BinaryOperator (Mod, _, _) ->
+      Primitive Float
+  | UnaryMathOperator _ ->
+      Primitive Float
   | Not _ ->
       Primitive Boolean
   | Index (_, _, t) ->
@@ -85,6 +110,8 @@ let get_type = function
       Primitive Float
   | Length _ ->
       Primitive Float
+  | Contains _ ->
+      Primitive Boolean
   | Answer ->
       Primitive String
   | XPosition ->
@@ -95,6 +122,14 @@ let get_type = function
       Primitive Float
   | Cast (_, t) ->
       t
+  | CostumeNumber ->
+      Primitive Float
+  | CostumeName ->
+      Primitive String
+  | BackdropNumber ->
+      Primitive Float
+  | BackdropName ->
+      Primitive String
 
 type code = statement list [@@deriving show]
 

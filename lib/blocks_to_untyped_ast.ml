@@ -4,19 +4,28 @@ open Stdlib
 let get_arg_name = function
   | Argument arg ->
       arg.name
-  | _ ->
-      failwith "could not find argument by arg id"
+  | block ->
+      failwith @@ "could not find argument by arg id, got block: "
+      ^ show_block block
 
-let rec expr_of_block = function
+let rec expr_of_block costumes block =
+  let expr_of_block = expr_of_block costumes in
+  match block with
   | Constant c ->
       Untyped_ast.Literal (Scratch_value.Primitive c)
   | Variable v ->
       Untyped_ast.Variable v
+  | List l ->
+      Untyped_ast.List l
   | Argument a ->
       Untyped_ast.Argument a.name
   | BinaryOperator b ->
       Untyped_ast.BinaryOperator
         (b.operator, expr_of_block b.arg1, expr_of_block b.arg2)
+  | UnaryMathOperator u ->
+      Untyped_ast.UnaryMathOperator (u.operator, expr_of_block u.arg)
+  | Random r ->
+      Untyped_ast.Random {min= expr_of_block r.min; max= expr_of_block r.max}
   | Not n ->
       Untyped_ast.Not (expr_of_block n.arg)
   | NumOfList n ->
@@ -25,6 +34,8 @@ let rec expr_of_block = function
       Untyped_ast.Index (i.list, expr_of_block i.index)
   | LengthOfList l ->
       Untyped_ast.Length l.list
+  | ListContainsItem l ->
+      Untyped_ast.Contains {list= l.list; item= expr_of_block l.item}
   | Answer ->
       Untyped_ast.Answer
   | XPosition ->
@@ -33,11 +44,29 @@ let rec expr_of_block = function
       Untyped_ast.YPosition
   | Direction ->
       Untyped_ast.Direction
-  | _ ->
-      failwith "block is not a valid expression"
+  | CurrentCostumeNumber ->
+      Untyped_ast.CostumeNumber
+  | CurrentCostumeName ->
+      Untyped_ast.CostumeName
+  | CurrentBackdropNumber ->
+      Untyped_ast.BackdropNumber
+  | CurrentBackdropName ->
+      Untyped_ast.BackdropName
+  | Costume c ->
+      Literal
+        (Primitive
+           (String
+              (string_of_int
+                 ( List.find_index (fun (x : Costume.t) -> x.name = c) costumes
+                 |> Option.get ) ) ) )
+  | Warn w ->
+      failwith @@ "warn is not a valid expression: " ^ w.message
+  | block ->
+      failwith @@ "block is not a valid expression: " ^ show_block block
 
 let rec statements_of_block parameter_mapping costumes backdrops block =
   let next = statements_of_block_opt parameter_mapping costumes backdrops in
+  let expr_of_block = expr_of_block costumes in
   match block with
   | ProceduresCall call ->
       Untyped_ast.FuncCall
@@ -83,11 +112,8 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
       Untyped_ast.ThinkForSeconds
         {message= expr_of_block s.message; duration= expr_of_block s.duration}
       :: next s.next
-  | SwitchCostume {next= next'; costume= Costume c} ->
-      Untyped_ast.SwitchCostume
-        ( List.find_index (fun (x : Costume.t) -> x.name = c) costumes
-        |> Option.get )
-      :: next next'
+  | SwitchCostume {next= next'; costume= c} ->
+      Untyped_ast.SwitchCostume (expr_of_block c) :: next next'
   | NextCostume n ->
       Untyped_ast.NextCostume :: next n.next
   | SwitchBackdrop {next= next'; backdrop= Backdrop b} ->
@@ -144,6 +170,8 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
       Untyped_ast.IfOnEdgeBounce :: next i.next
   | SetRotationStyle r ->
       Untyped_ast.SetRotationStyle r.style :: next r.next
+  | Warn w ->
+      Untyped_ast.Warn w.message :: next w.next
   | block ->
       failwith @@ "block is not a valid statement" ^ show_block block
 

@@ -3,25 +3,41 @@ type binary_operator =
   | Lt
   | Subtract
   | Add
+  | Multiply
+  | Divide
   | Equals
+  | And
   | Or
   | Join
   | LetterOf
+  | Contains
+  | Mod
+[@@deriving show]
+
+type unary_math_operator = Abs | Floor | Ceil | Sqrt | Round | Length
 [@@deriving show]
 
 type expr =
   | Argument of string
   | Variable of string
+  | List of string
   | Literal of Scratch_value.t
   | BinaryOperator of binary_operator * expr * expr
+  | UnaryMathOperator of unary_math_operator * expr
+  | Random of {min: expr; max: expr}
   | Not of expr
   | Index of string * expr
   | IndexOf of string * expr
   | Length of string
+  | Contains of {list: string; item: expr}
   | Answer
   | XPosition
   | YPosition
   | Direction
+  | CostumeNumber
+  | CostumeName
+  | BackdropNumber
+  | BackdropName
 [@@deriving show]
 
 type statement =
@@ -38,7 +54,7 @@ type statement =
   | SayForSeconds of {message: expr; duration: expr}
   | Think of expr
   | ThinkForSeconds of {message: expr; duration: expr}
-  | SwitchCostume of int
+  | SwitchCostume of expr
   | NextCostume
   | SwitchBackdrop of int
   | NextBackdrop
@@ -62,6 +78,7 @@ type statement =
   | PointTowards of string
   | IfOnEdgeBounce
   | SetRotationStyle of Rotation_style.t
+  | Warn of string
 [@@deriving show]
 
 type code = statement list [@@deriving show]

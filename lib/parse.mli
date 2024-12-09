@@ -10,11 +10,14 @@ type input =
   | Id of string
   | Variable of string
   | Value of Scratch_value.primitive_value
+  | Broadcast of string
+  | List of string
 [@@deriving show]
 
 type input_opt = input option [@@deriving show, yojson]
 
-type mutation = {proccode: string} [@@deriving show, yojson {strict= false}]
+type mutation = {proccode: string option}
+[@@deriving show, yojson {strict= false}]
 
 type block =
   { opcode: string

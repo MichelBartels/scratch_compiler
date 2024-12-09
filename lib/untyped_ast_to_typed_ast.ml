@@ -34,6 +34,8 @@ let output_type ?function_name = function
         , a )
   | Variable v ->
       Variable v
+  | List l ->
+      Variable l
   | Literal l ->
       Type
         ( match l with
@@ -52,14 +54,28 @@ let output_type ?function_name = function
             Float
         | Add ->
             Float
+        | Multiply ->
+            Float
+        | Divide ->
+            Float
         | Equals ->
             Boolean
         | Or ->
             Boolean
+        | And ->
+            Boolean
         | Join ->
             String
         | LetterOf ->
-            String )
+            String
+        | Contains ->
+            Boolean
+        | Mod ->
+            Float )
+  | UnaryMathOperator _ ->
+      Type Float
+  | Random _ ->
+      Type Float
   | Not _ ->
       Type Boolean
   | Index (l, _) ->
@@ -68,6 +84,8 @@ let output_type ?function_name = function
       Type Float
   | Length _ ->
       Type Float
+  | Contains _ ->
+      Type Boolean
   | Answer ->
       Type String
   | XPosition ->
@@ -76,6 +94,14 @@ let output_type ?function_name = function
       Type Float
   | Direction ->
       Type Float
+  | CostumeNumber ->
+      Type Float
+  | CostumeName ->
+      Type String
+  | BackdropNumber ->
+      Type Float
+  | BackdropName ->
+      Type String
 
 let statement_entrypoint_map f sprites =
   List.map
@@ -312,7 +338,9 @@ let var_type types var =
   | Some t ->
       reduce_to_single_type t
   | None ->
-      failwith @@ "no type inferred for: " ^ var
+      print_endline @@ "no type inferred for variable: " ^ var
+      ^ " falling back to string" ;
+      Scratch_type.String
 
 let arg_type types (f, a) =
   print_endline @@ "searching for: " ^ a ^ " in " ^ f ;
@@ -320,7 +348,9 @@ let arg_type types (f, a) =
   | Some t ->
       reduce_to_single_type t
   | None ->
-      failwith @@ "no type inferred for: " ^ a
+      print_endline @@ "no type inferred for list: (" ^ f ^ ", " ^ a
+      ^ ") falling back to string" ;
+      Scratch_type.String
 
 let rec convert_expr ?funname types e =
   let convert = convert_expr ?funname types in
@@ -338,11 +368,19 @@ let rec convert_expr ?funname types e =
       Typed_ast.Argument (arg, Primitive (arg_type (funname, arg)))
   | Variable var ->
       Variable (var, Primitive (var_type var))
+  | List l ->
+      List (l, List (var_type l))
   | Literal v ->
       Literal v
   | BinaryOperator (op, e1, e2) ->
       let t1, t2 = bin_op_input_type ?funname types e1 e2 op in
       BinaryOperator (op, convert e1 |> cast t1, convert e2 |> cast t2)
+  | UnaryMathOperator (op, e) ->
+      UnaryMathOperator (op, convert e |> cast (Primitive Float))
+  | Random r ->
+      Random
+        { min= convert r.min |> cast (Primitive Float)
+        ; max= convert r.max |> cast (Primitive Float) }
   | Not e ->
       Not (convert e |> cast (Primitive Boolean))
   | Index (name, i) ->
@@ -352,6 +390,10 @@ let rec convert_expr ?funname types e =
       IndexOf (name, convert e |> cast (Primitive (var_type name)))
   | Length l ->
       Length l
+  | Contains c ->
+      Contains
+        { list= c.list
+        ; item= convert c.item |> cast (Primitive (var_type c.list)) }
   | Answer ->
       Answer
   | XPosition ->
@@ -360,6 +402,14 @@ let rec convert_expr ?funname types e =
       YPosition
   | Direction ->
       Direction
+  | CostumeNumber ->
+      CostumeNumber
+  | CostumeName ->
+      CostumeName
+  | BackdropNumber ->
+      BackdropNumber
+  | BackdropName ->
+      BackdropName
 
 and bin_op_input_type ?funname types e1 e2 = function
   | Untyped_ast.Gt ->
@@ -369,6 +419,10 @@ and bin_op_input_type ?funname types e1 e2 = function
   | Subtract ->
       (Primitive Float, Primitive Float)
   | Add ->
+      (Primitive Float, Primitive Float)
+  | Multiply ->
+      (Primitive Float, Primitive Float)
+  | Divide ->
       (Primitive Float, Primitive Float)
   | Equals -> (
       let e1 = convert_expr ?funname types e1 in
@@ -388,10 +442,16 @@ and bin_op_input_type ?funname types e1 e2 = function
           (Primitive Boolean, Primitive Boolean) )
   | Or ->
       (Primitive Boolean, Primitive Boolean)
+  | And ->
+      (Primitive Boolean, Primitive Boolean)
   | Join ->
       (Primitive String, Primitive String)
   | LetterOf ->
       (Primitive Float, Primitive String)
+  | Contains ->
+      (Primitive String, Primitive String)
+  | Mod ->
+      (Primitive Float, Primitive Float)
 
 let rec convert_statement ?funname types stmt =
   let convert = convert_expr ?funname types in
@@ -444,7 +504,7 @@ let rec convert_statement ?funname types stmt =
         { message= convert s.message |> cast (Primitive String)
         ; duration= convert s.duration |> cast (Primitive Float) }
   | SwitchCostume c ->
-      SwitchCostume c
+      SwitchCostume (convert c |> cast (Primitive String))
   | NextCostume ->
       NextCostume
   | SwitchBackdrop b ->
@@ -498,6 +558,8 @@ let rec convert_statement ?funname types stmt =
       IfOnEdgeBounce
   | SetRotationStyle r ->
       SetRotationStyle r
+  | Warn s ->
+      Warn s
 
 let convert_variable types n v =
   let t = var_type types n in

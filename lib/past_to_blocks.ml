@@ -52,8 +52,10 @@ let parse_target target =
                 { parameters=
                     StringMap.map input_to_block inputs
                     |> StringMap.map Option.get
-                ; proccode= Option.get proccode }
+                ; proccode= proccode |> Option.get |> Option.get }
           | "argument_reporter_string_number" ->
+              Argument {name= StringMap.find "VALUE" fields |> fst}
+          | "argument_reporter_boolean" ->
               Argument {name= StringMap.find "VALUE" fields |> fst}
           | "operator_gt" ->
               create_op_block inputs Untyped_ast.Gt "OPERAND1" "OPERAND2"
@@ -63,16 +65,51 @@ let parse_target target =
               create_op_block inputs Equals "OPERAND1" "OPERAND2"
           | "operator_or" ->
               create_op_block inputs Or "OPERAND1" "OPERAND2"
+          | "operator_and" ->
+              create_op_block inputs And "OPERAND1" "OPERAND2"
           | "operator_subtract" ->
               create_op_block inputs Subtract "NUM1" "NUM2"
           | "operator_add" ->
               create_op_block inputs Add "NUM1" "NUM2"
+          | "operator_multiply" ->
+              create_op_block inputs Multiply "NUM1" "NUM2"
+          | "operator_divide" ->
+              create_op_block inputs Divide "NUM1" "NUM2"
           | "operator_join" ->
               create_op_block inputs Join "STRING1" "STRING2"
           | "operator_letter_of" ->
               create_op_block inputs LetterOf "LETTER" "STRING"
           | "operator_not" ->
               Not {arg= input_field_to_block inputs "OPERAND"}
+          | "operator_random" ->
+              Random
+                { min= input_field_to_block inputs "FROM"
+                ; max= input_field_to_block inputs "TO" }
+          | "operator_contains" ->
+              create_op_block inputs Contains "STRING1" "STRING2"
+          | "operator_mod" ->
+              create_op_block inputs Mod "NUM1" "NUM2"
+          | "operator_mathop" ->
+              UnaryMathOperator
+                { operator=
+                    ( match StringMap.find "OPERATOR" fields |> fst with
+                    | "abs" ->
+                        Abs
+                    | "floor" ->
+                        Floor
+                    | "ceiling" ->
+                        Ceil
+                    | "sqrt" ->
+                        Sqrt
+                    | op ->
+                        failwith @@ "unsupported math operator: " ^ op )
+                ; arg= input_field_to_block inputs "NUM" }
+          | "operator_round" ->
+              UnaryMathOperator
+                {operator= Round; arg= input_field_to_block inputs "NUM"}
+          | "operator_length" ->
+              UnaryMathOperator
+                {operator= Length; arg= input_field_to_block inputs "STRING"}
           | "procedures_call" ->
               ProceduresCall
                 { next
@@ -80,7 +117,7 @@ let parse_target target =
                     StringMap.bindings inputs
                     |> List.map (fun (name, input) ->
                            (name, Option.get (input_to_block input)) )
-                ; proccode= Option.get proccode }
+                ; proccode= proccode |> Option.get |> Option.get }
           | "event_whenflagclicked" ->
               Start {next}
           | "control_if_else" ->
@@ -128,6 +165,10 @@ let parse_target target =
                 ; item= input_field_to_block inputs "ITEM" }
           | "data_lengthoflist" ->
               LengthOfList {list= extract_field fields "LIST"}
+          | "data_listcontainsitem" ->
+              ListContainsItem
+                { list= extract_field fields "LIST"
+                ; item= input_field_to_block inputs "ITEM" }
           | "control_repeat_until" ->
               RepeatUntil
                 { next
@@ -195,6 +236,10 @@ let parse_target target =
                         Backward
                     | _ ->
                         failwith "invalid front/back" ) }
+          | "looks_costumenumbername" ->
+              if StringMap.find "NUMBER_NAME" fields |> fst = "number" then
+                CurrentCostumeNumber
+              else CurrentCostumeName
           | "sensing_askandwait" ->
               Ask {next; question= input_field_to_block inputs "QUESTION"}
           | "sensing_answer" ->
@@ -254,7 +299,9 @@ let parse_target target =
                     Rotation_style.of_string
                       (StringMap.find "STYLE" fields |> fst) }
           | opcode ->
-              failwith @@ "invalid opcode: " ^ opcode
+              print_endline @@ "Block with opcode " ^ opcode
+              ^ " is not supported. It will be skipped." ;
+              Warn {next; message= opcode ^ " is skipped"}
         in
         update_block id block
   and update_block id block =
@@ -272,13 +319,19 @@ let parse_target target =
         Some (Blocks.Variable var)
     | Some (Value value) ->
         Some (Blocks.Constant value)
+    | Some (Broadcast _) ->
+        failwith "Broadcast not supported"
+    | Some (List id) ->
+        Some (Blocks.List id)
     | None ->
         None
   and input_field_to_block_opt inputs field =
     let input = StringMap.find_opt field inputs in
     Option.bind input input_to_block
   and input_field_to_block inputs field =
-    Option.get (input_field_to_block_opt inputs field)
+    Option.value
+      (input_field_to_block_opt inputs field)
+      ~default:(Constant (Boolean false))
   and extract_field fields field =
     StringMap.find field fields |> snd |> Option.get
   in
