@@ -119,6 +119,34 @@ let parse_target target =
                 ; proccode= proccode |> Option.get |> Option.get }
           | "event_whenflagclicked" ->
               Start {next}
+          | "event_whenbroadcastreceived" ->
+              OnBroadcast
+                { next
+                ; broadcast=
+                    StringMap.find "BROADCAST_OPTION" fields
+                    |> snd |> Option.get }
+          | "event_broadcast" ->
+              Broadcast
+                { next
+                ; broadcast=
+                    ( StringMap.find "BROADCAST_INPUT" inputs
+                    |> Option.get
+                    |> function
+                    | Broadcast id ->
+                        id
+                    | _ ->
+                        failwith "dynamic broadcast not supported" ) }
+          | "event_broadcastandwait" ->
+              BroadcastAndWait
+                { next
+                ; broadcast=
+                    ( StringMap.find "BROADCAST_INPUT" inputs
+                    |> Option.get
+                    |> function
+                    | Broadcast id ->
+                        id
+                    | _ ->
+                        failwith "dynamic broadcast not supported" ) }
           | "control_if_else" ->
               IfThenElse
                 { next
@@ -245,6 +273,12 @@ let parse_target target =
               Ask {next; question= input_field_to_block inputs "QUESTION"}
           | "sensing_answer" ->
               Answer
+          | "sensing_touchingobject" ->
+              TouchingObject
+                {target= input_field_to_block inputs "TOUCHINGOBJECTMENU"}
+          | "sensing_touchingobjectmenu" ->
+              TouchingObjectMenu
+                (StringMap.find "TOUCHINGOBJECTMENU" fields |> fst)
           | "motion_setx" ->
               SetX {next; x= input_field_to_block inputs "X"}
           | "motion_sety" ->

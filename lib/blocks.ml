@@ -13,6 +13,9 @@ type block =
   | ProceduresCall of
       {next: block option; inputs: (string * block) list; proccode: string}
   | Start of {next: block option}
+  | OnBroadcast of {next: block option; broadcast: string}
+  | Broadcast of {next: block option; broadcast: string}
+  | BroadcastAndWait of {next: block option; broadcast: string}
   | IfThenElse of
       { next: block option
       ; condition: block
@@ -54,6 +57,8 @@ type block =
   | CurrentBackdropName
   | Ask of {next: block option; question: block}
   | Answer
+  | TouchingObject of {target: block}
+  | TouchingObjectMenu of string
   | SetX of {next: block option; x: block}
   | SetY of {next: block option; y: block}
   | ChangeXBy of {next: block option; x: block}

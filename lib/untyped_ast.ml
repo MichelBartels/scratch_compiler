@@ -31,6 +31,7 @@ type expr =
   | ListLength of string
   | Contains of {list: string; item: expr}
   | Answer
+  | TouchesCursor
   | XPosition
   | YPosition
   | Direction
@@ -42,6 +43,8 @@ type expr =
 
 type statement =
   | FuncCall of string * expr Parse.JsonMap.t
+  | Broadcast of string
+  | BroadcastAndWait of string
   | Branch of expr * statement list * statement list
   | SetVariable of string * expr
   | AddToList of string * expr
@@ -90,6 +93,7 @@ type sprite =
   { functions: scratch_function Parse.JsonMap.t
   ; variables: Scratch_value.t Parse.JsonMap.t
   ; entry_points: code list
+  ; broadcasts: code list Parse.JsonMap.t
   ; current_costume: int
   ; costumes: Costume.t list
   ; name: string

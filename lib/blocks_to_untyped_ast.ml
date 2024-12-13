@@ -40,6 +40,8 @@ let rec expr_of_block costumes backdrops block =
       Untyped_ast.Contains {list= l.list; item= expr_of_block l.item}
   | Answer ->
       Untyped_ast.Answer
+  | TouchingObject {target= TouchingObjectMenu t} when t = "_mouse_" ->
+      Untyped_ast.TouchesCursor
   | XPosition ->
       Untyped_ast.XPosition
   | YPosition ->
@@ -86,6 +88,10 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
                  , expr_of_block input ) )
           |> Parse.StringMap.of_list )
       :: next call.next
+  | Broadcast b ->
+      Untyped_ast.Broadcast b.broadcast :: next b.next
+  | BroadcastAndWait b ->
+      Untyped_ast.BroadcastAndWait b.broadcast :: next b.next
   | IfThenElse br ->
       Untyped_ast.Branch
         (expr_of_block br.condition, next br.then_branch, next br.else_branch)
@@ -222,6 +228,26 @@ let create_entrypoints parameter_mapping backdrops sprite =
           None )
     sprite.blocks
 
+let create_broadcasts parameter_mapping backdrops sprite =
+  List.filter_map
+    (function
+      | OnBroadcast b ->
+          Some
+            ( b.broadcast
+            , statements_of_block_opt parameter_mapping sprite.costumes
+                backdrops b.next )
+      | _ ->
+          None )
+    sprite.blocks
+  |> List.fold_left
+       (fun acc (broadcast, code) ->
+         match Parse.StringMap.find_opt broadcast acc with
+         | Some existing_code ->
+             Parse.StringMap.add broadcast (code :: existing_code) acc
+         | None ->
+             Parse.StringMap.add broadcast [code] acc )
+       Parse.StringMap.empty
+
 let union_exn = Parse.StringMap.union (fun _ _ -> failwith "duplicate key")
 
 let convert_sprite backdrops sprite =
@@ -244,6 +270,7 @@ let convert_sprite backdrops sprite =
     { functions= Parse.StringMap.of_list functions
     ; variables= sprite.variables
     ; entry_points= create_entrypoints global_parameter_mapping backdrops sprite
+    ; broadcasts= create_broadcasts global_parameter_mapping backdrops sprite
     ; current_costume= sprite.current_costume
     ; costumes= sprite.costumes
     ; name= sprite.name

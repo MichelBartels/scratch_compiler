@@ -90,6 +90,8 @@ let output_type ?function_name = function
       Type Boolean
   | Answer ->
       Type String
+  | TouchesCursor ->
+      Type Boolean
   | XPosition ->
       Type Float
   | YPosition ->
@@ -106,9 +108,17 @@ let output_type ?function_name = function
       Type String
 
 let statement_entrypoint_map f sprites =
-  List.map
-    (fun sprite -> List.map (List.map f) sprite.Untyped_ast.entry_points)
-    sprites
+  ( List.map
+      (fun sprite ->
+        Parse.StringMap.map
+          (List.map (List.map f))
+          sprite.Untyped_ast.broadcasts
+        |> Parse.StringMap.bindings |> List.map snd )
+      sprites
+  |> List.flatten )
+  @ List.map
+      (fun sprite -> List.map (List.map f) sprite.Untyped_ast.entry_points)
+      sprites
   |> List.flatten |> List.flatten |> List.flatten
 
 let statement_function_map f sprites =
@@ -392,6 +402,8 @@ let rec convert_expr ?funname types e =
         ; item= convert c.item |> cast (Primitive (var_type c.list)) }
   | Answer ->
       Answer
+  | TouchesCursor ->
+      TouchesCursor
   | XPosition ->
       XPosition
   | YPosition ->
@@ -462,6 +474,10 @@ let rec convert_statement ?funname types stmt =
           |> List.map (fun (k, v) ->
                  (k, convert v |> cast (Primitive (arg_type (name, k)))) )
           |> Parse.StringMap.of_list )
+  | Broadcast b ->
+      Broadcast b
+  | BroadcastAndWait b ->
+      BroadcastAndWait b
   | Branch (cond, then_branch, else_branch) ->
       Branch
         ( convert cond |> cast (Primitive Boolean)
@@ -580,6 +596,8 @@ let convert_function types n f =
           f.Untyped_ast.parameters
     ; code= List.map (convert_statement ~funname:n types) f.code } )
 
+let convert_code types = List.map (convert_statement types)
+
 let convert_sprite types sprite =
   { variables=
       Parse.StringMap.mapi (convert_variable types) sprite.Untyped_ast.variables
@@ -587,10 +605,11 @@ let convert_sprite types sprite =
   ; functions=
       Parse.StringMap.mapi (convert_function types) sprite.Untyped_ast.functions
       |> Parse.StringMap.map snd
-  ; entry_points=
-      List.map
-        (List.map (convert_statement types))
-        sprite.Untyped_ast.entry_points
+  ; entry_points= List.map (convert_code types) sprite.Untyped_ast.entry_points
+  ; broadcasts=
+      Parse.StringMap.map
+        (List.map (convert_code types))
+        sprite.Untyped_ast.broadcasts
   ; current_costume= sprite.Untyped_ast.current_costume
   ; costumes= sprite.Untyped_ast.costumes
   ; name= sprite.Untyped_ast.name
