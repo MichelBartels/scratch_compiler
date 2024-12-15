@@ -16,6 +16,7 @@ type block =
   | OnBroadcast of {next: block option; broadcast: string}
   | Broadcast of {next: block option; broadcast: string}
   | BroadcastAndWait of {next: block option; broadcast: string}
+  | OnClick of {next: block option}
   | IfThenElse of
       { next: block option
       ; condition: block
@@ -24,6 +25,8 @@ type block =
   | SetVariable of {next: block option; variable: string; value: block}
   | AddToList of {next: block option; list: string; item: block}
   | DeleteAllOfList of {next: block option; list: string}
+  | DeleteOfList of {next: block option; list: string; index: block}
+  | InsertAtList of {next: block option; list: string; index: block; item: block}
   | NumOfList of {list: string; item: block}
   | ChangeVariableBy of {next: block option; value: block; variable: string}
   | ItemOfList of {list: string; index: block}
@@ -46,6 +49,7 @@ type block =
   | Backdrop of string
   | NextBackdrop of {next: block option}
   | ChangeSizeBy of {next: block option; size: block}
+  | SetSizeTo of {next: block option; size: block}
   | Show of {next: block option}
   | Hide of {next: block option}
   | GoForwardBackwardLayers of
@@ -59,6 +63,8 @@ type block =
   | Answer
   | TouchingObject of {target: block}
   | TouchingObjectMenu of string
+  | SensingOf of {obj: block; property: Sensing_property.t}
+  | SensingOfMenu of string
   | SetX of {next: block option; x: block}
   | SetY of {next: block option; y: block}
   | ChangeXBy of {next: block option; x: block}
@@ -71,6 +77,8 @@ type block =
   | MoveSteps of {next: block option; steps: block}
   | XPosition
   | YPosition
+  | MouseX
+  | MouseY
   | Direction
   | GlideToXY of {next: block option; x: block; y: block; duration: block}
   | GlideTo of {next: block option; target: block; duration: block}
@@ -94,7 +102,8 @@ type sprite =
   ; y: float
   ; direction: float
   ; rotation_style: Rotation_style.t
-  ; is_stage: bool }
+  ; is_stage: bool
+  ; visible: bool }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: variables} [@@deriving show]

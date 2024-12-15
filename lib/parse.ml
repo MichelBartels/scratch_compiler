@@ -14,8 +14,14 @@ end = struct
         List.fold_left
           (fun acc (k, v) ->
             Result.bind acc (fun acc ->
-                Result.bind (a_of_yojson v) (fun v ->
-                    Ok (StringMap.add k v acc) ) ) )
+                match a_of_yojson v with
+                | Ok v ->
+                    Ok (StringMap.add k v acc)
+                | Error _ ->
+                    print_endline @@ "Could not parse block: "
+                    ^ Yojson.Safe.to_string v ;
+                    print_endline "Is there an unused block in the project?" ;
+                    Ok acc ) )
           (Ok StringMap.empty) l
     | _ ->
         Error "JsonMap.of_yojson: expected `Assoc"
@@ -121,7 +127,8 @@ type target =
   ; x: float [@default 0.]
   ; y: float [@default 0.]
   ; direction: float [@default 90.]
-  ; rotation_style: string [@key "rotationStyle"] [@default "don't rotate"] }
+  ; rotation_style: string [@key "rotationStyle"] [@default "don't rotate"]
+  ; visible: bool [@default true] }
 [@@deriving show, yojson {strict= false}]
 
 type program = {targets: target list}

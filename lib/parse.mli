@@ -42,7 +42,8 @@ type target =
   ; x: float
   ; y: float
   ; direction: float
-  ; rotation_style: string }
+  ; rotation_style: string
+  ; visible: bool }
 [@@deriving show, yojson {strict= false}]
 
 type program = {targets: target list}

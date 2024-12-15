@@ -119,6 +119,8 @@ let parse_target target =
                 ; proccode= proccode |> Option.get |> Option.get }
           | "event_whenflagclicked" ->
               Start {next}
+          | "event_whenthisspriteclicked" ->
+              OnClick {next}
           | "event_whenbroadcastreceived" ->
               OnBroadcast
                 { next
@@ -171,6 +173,17 @@ let parse_target target =
                 ; item= input_field_to_block inputs "ITEM" }
           | "data_deletealloflist" ->
               DeleteAllOfList {next; list= extract_field fields "LIST"}
+          | "data_deleteoflist" ->
+              DeleteOfList
+                { next
+                ; list= extract_field fields "LIST"
+                ; index= input_field_to_block inputs "INDEX" }
+          | "data_insertatlist" ->
+              InsertAtList
+                { next
+                ; list= extract_field fields "LIST"
+                ; index= input_field_to_block inputs "INDEX"
+                ; item= input_field_to_block inputs "ITEM" }
           | "data_itemnumoflist" ->
               NumOfList
                 { list= extract_field fields "LIST"
@@ -238,6 +251,8 @@ let parse_target target =
               NextBackdrop {next}
           | "looks_changesizeby" ->
               ChangeSizeBy {next; size= input_field_to_block inputs "CHANGE"}
+          | "looks_setsizeto" ->
+              SetSizeTo {next; size= input_field_to_block inputs "SIZE"}
           | "looks_show" ->
               Show {next}
           | "looks_hide" ->
@@ -269,6 +284,10 @@ let parse_target target =
               if StringMap.find "NUMBER_NAME" fields |> fst = "number" then
                 CurrentCostumeNumber
               else CurrentCostumeName
+          | "looks_backdropnumbername" ->
+              if StringMap.find "NUMBER_NAME" fields |> fst = "number" then
+                CurrentBackdropNumber
+              else CurrentBackdropName
           | "sensing_askandwait" ->
               Ask {next; question= input_field_to_block inputs "QUESTION"}
           | "sensing_answer" ->
@@ -279,6 +298,25 @@ let parse_target target =
           | "sensing_touchingobjectmenu" ->
               TouchingObjectMenu
                 (StringMap.find "TOUCHINGOBJECTMENU" fields |> fst)
+          | "sensing_mousex" ->
+              MouseX
+          | "sensing_mousey" ->
+              MouseY
+          | "sensing_of" ->
+              SensingOf
+                { obj= input_field_to_block inputs "OBJECT"
+                ; property=
+                    ( StringMap.find "PROPERTY" fields
+                    |> fst
+                    |> function
+                    | "costume name" ->
+                        Sensing_property.CostumeName
+                    | prop ->
+                        failwith
+                        @@ "Property in sensing_of block not supported: " ^ prop
+                    ) }
+          | "sensing_of_object_menu" ->
+              SensingOfMenu (StringMap.find "OBJECT" fields |> fst)
           | "motion_setx" ->
               SetX {next; x= input_field_to_block inputs "X"}
           | "motion_sety" ->
@@ -393,7 +431,8 @@ let parse_target target =
           DontRotate
       | _ ->
           failwith "invalid rotation style" )
-  ; is_stage= target.is_stage }
+  ; is_stage= target.is_stage
+  ; visible= target.visible }
 
 let convert program =
   let stage, sprites = partition_targets program.targets in

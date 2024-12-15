@@ -96,6 +96,12 @@ let output_type ?function_name = function
       Type Float
   | YPosition ->
       Type Float
+  | MouseX ->
+      Type Float
+  | MouseY ->
+      Type Float
+  | SensingOf _ ->
+      Type String
   | Direction ->
       Type Float
   | CostumeNumber ->
@@ -118,6 +124,9 @@ let statement_entrypoint_map f sprites =
   |> List.flatten )
   @ List.map
       (fun sprite -> List.map (List.map f) sprite.Untyped_ast.entry_points)
+      sprites
+  @ List.map
+      (fun sprite -> List.map (List.map f) sprite.Untyped_ast.on_clicks)
       sprites
   |> List.flatten |> List.flatten |> List.flatten
 
@@ -408,6 +417,12 @@ let rec convert_expr ?funname types e =
       XPosition
   | YPosition ->
       YPosition
+  | MouseX ->
+      MouseX
+  | MouseY ->
+      MouseY
+  | SensingOf {obj; property} ->
+      SensingOf {obj; property}
   | Direction ->
       Direction
   | CostumeNumber ->
@@ -489,6 +504,13 @@ let rec convert_statement ?funname types stmt =
       AddToList (name, convert e |> cast (Primitive (var_type name)))
   | DeleteAllOfList name ->
       DeleteAllOfList name
+  | DeleteOfList d ->
+      DeleteOfList (d.list, convert d.index |> cast (Primitive Float))
+  | InsertAtList l ->
+      InsertAtList
+        { list= l.list
+        ; index= convert l.index |> cast (Primitive Float)
+        ; item= convert l.item |> cast (Primitive (var_type l.list)) }
   | IncrVariable (name, e) ->
       IncrVariable (name, convert e |> cast (Primitive Float))
   | SetIndex s ->
@@ -527,6 +549,8 @@ let rec convert_statement ?funname types stmt =
       NextBackdrop
   | ChangeSizeBy s ->
       ChangeSizeBy (convert s |> cast (Primitive Float))
+  | SetSizeTo s ->
+      SetSizeTo (convert s |> cast (Primitive Float))
   | Show ->
       Show
   | Hide ->
@@ -610,6 +634,7 @@ let convert_sprite types sprite =
       Parse.StringMap.map
         (List.map (convert_code types))
         sprite.Untyped_ast.broadcasts
+  ; on_clicks= List.map (convert_code types) sprite.Untyped_ast.on_clicks
   ; current_costume= sprite.Untyped_ast.current_costume
   ; costumes= sprite.Untyped_ast.costumes
   ; name= sprite.Untyped_ast.name
@@ -617,7 +642,8 @@ let convert_sprite types sprite =
   ; y= sprite.Untyped_ast.y
   ; direction= sprite.Untyped_ast.direction
   ; rotation_style= sprite.Untyped_ast.rotation_style
-  ; is_stage= sprite.Untyped_ast.is_stage }
+  ; is_stage= sprite.Untyped_ast.is_stage
+  ; visible= sprite.Untyped_ast.visible }
 
 let convert program =
   let types = types program in

@@ -46,6 +46,12 @@ let rec expr_of_block costumes backdrops block =
       Untyped_ast.XPosition
   | YPosition ->
       Untyped_ast.YPosition
+  | MouseX ->
+      Untyped_ast.MouseX
+  | MouseY ->
+      Untyped_ast.MouseY
+  | SensingOf {obj= SensingOfMenu obj; property} ->
+      Untyped_ast.SensingOf {obj; property}
   | Direction ->
       Untyped_ast.Direction
   | CurrentCostumeNumber ->
@@ -103,6 +109,15 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
       Untyped_ast.AddToList (add.list, expr_of_block add.item) :: next add.next
   | DeleteAllOfList del ->
       Untyped_ast.DeleteAllOfList del.list :: next del.next
+  | DeleteOfList del ->
+      Untyped_ast.DeleteOfList {list= del.list; index= expr_of_block del.index}
+      :: next del.next
+  | InsertAtList ins ->
+      Untyped_ast.InsertAtList
+        { list= ins.list
+        ; index= expr_of_block ins.index
+        ; item= expr_of_block ins.item }
+      :: next ins.next
   | ChangeVariableBy c ->
       Untyped_ast.IncrVariable (c.variable, expr_of_block c.value)
       :: next c.next
@@ -139,6 +154,8 @@ let rec statements_of_block parameter_mapping costumes backdrops block =
       Untyped_ast.NextBackdrop :: next n.next
   | ChangeSizeBy c ->
       Untyped_ast.ChangeSizeBy (expr_of_block c.size) :: next c.next
+  | SetSizeTo s ->
+      Untyped_ast.SetSizeTo (expr_of_block s.size) :: next s.next
   | Show s ->
       Untyped_ast.Show :: next s.next
   | Hide h ->
@@ -248,6 +265,17 @@ let create_broadcasts parameter_mapping backdrops sprite =
              Parse.StringMap.add broadcast [code] acc )
        Parse.StringMap.empty
 
+let create_on_clicks parameter_mapping backdrops sprite =
+  List.filter_map
+    (function
+      | OnClick o ->
+          Some
+            (statements_of_block_opt parameter_mapping sprite.costumes backdrops
+               o.next )
+      | _ ->
+          None )
+    sprite.blocks
+
 let union_exn = Parse.StringMap.union (fun _ _ -> failwith "duplicate key")
 
 let convert_sprite backdrops sprite =
@@ -271,6 +299,7 @@ let convert_sprite backdrops sprite =
     ; variables= sprite.variables
     ; entry_points= create_entrypoints global_parameter_mapping backdrops sprite
     ; broadcasts= create_broadcasts global_parameter_mapping backdrops sprite
+    ; on_clicks= create_on_clicks global_parameter_mapping backdrops sprite
     ; current_costume= sprite.current_costume
     ; costumes= sprite.costumes
     ; name= sprite.name
@@ -278,7 +307,8 @@ let convert_sprite backdrops sprite =
     ; y= sprite.y
     ; direction= sprite.direction
     ; rotation_style= sprite.rotation_style
-    ; is_stage= sprite.is_stage }
+    ; is_stage= sprite.is_stage
+    ; visible= sprite.visible }
 
 let convert (program : program) =
   let backdrops =

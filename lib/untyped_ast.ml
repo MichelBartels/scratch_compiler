@@ -34,6 +34,9 @@ type expr =
   | TouchesCursor
   | XPosition
   | YPosition
+  | MouseX
+  | MouseY
+  | SensingOf of {obj: string; property: Sensing_property.t}
   | Direction
   | CostumeNumber
   | CostumeName
@@ -49,6 +52,8 @@ type statement =
   | SetVariable of string * expr
   | AddToList of string * expr
   | DeleteAllOfList of string
+  | DeleteOfList of {list: string; index: expr}
+  | InsertAtList of {list: string; index: expr; item: expr}
   | IncrVariable of string * expr
   | SetIndex of {list: string; index: expr; value: expr}
   | WhileNot of expr * statement list
@@ -63,6 +68,7 @@ type statement =
   | SwitchBackdrop of expr
   | NextBackdrop
   | ChangeSizeBy of expr
+  | SetSizeTo of expr
   | Show
   | Hide
   | GoForwardBackwardLayers of expr * Layer_direction.t
@@ -94,6 +100,7 @@ type sprite =
   ; variables: Scratch_value.t Parse.JsonMap.t
   ; entry_points: code list
   ; broadcasts: code list Parse.JsonMap.t
+  ; on_clicks: code list
   ; current_costume: int
   ; costumes: Costume.t list
   ; name: string
@@ -101,7 +108,8 @@ type sprite =
   ; y: float
   ; direction: float
   ; rotation_style: Rotation_style.t
-  ; is_stage: bool }
+  ; is_stage: bool
+  ; visible: bool }
 [@@deriving show]
 
 type program = {sprites: sprite list; globals: Scratch_value.t Parse.JsonMap.t}
