@@ -7,39 +7,79 @@ let llmodule = Llvm.create_module context "module"
 
 let builder = Llvm.builder context
 
+type sprite_state =
+  { variables: (string * (Scratch_type.primitive_type * Llvm.llvalue)) list
+  ; sprite: Llvm.llvalue }
+
 module Function = struct
   type t =
     { parameters: (string * Llvm.llvalue) list
     ; f: Llvm.llvalue
     ; entry: Llvm.llbasicblock
     ; ty: Llvm.lltype
-    ; scratch: Typed_ast.scratch_function }
+    ; scratch: Typed_ast.scratch_function
+    ; sprite_state: sprite_state }
 
-  let declare scratch_function =
+  let declare sprite scratch_function =
     let param_types =
       List.map
         (fun (_, scratch_type) -> Scratch_type.to_lltype scratch_type context)
         scratch_function.Typed_ast.parameters
     in
-    let param_types = param_types in
+    let variable_types =
+      List.map (fun (_, (value, primitive_type)) ->
+          match value with
+          | Scratch_value.Primitive _ ->
+              Scratch_type.to_lltype (Primitive primitive_type) context
+          | Scratch_value.List _ ->
+              Scratch_type.to_lltype (List primitive_type) context )
+      @@ Parse.StringMap.bindings sprite.Typed_ast.variables
+    in
+    let sprite_type = Llvm.pointer_type context in
     let ty =
-      Llvm.function_type (Llvm.void_type context) (Array.of_list param_types)
+      Llvm.function_type (Llvm.void_type context)
+      @@ Array.of_list
+      @@ (sprite_type :: variable_types)
+      @ param_types
     in
     let f = Llvm.declare_function "" ty llmodule in
-    let parameters = Llvm.params f |> Array.to_list in
+    let parameters = Llvm.params f in
+    let variables =
+      Array.to_list @@ Array.sub parameters 1 (List.length variable_types)
+    in
+    let variables =
+      List.map2
+        (fun (name, (_, primitive_type)) variable ->
+          (name, (primitive_type, variable)) )
+        (Parse.StringMap.bindings sprite.Typed_ast.variables)
+        variables
+    in
+    let sprite = parameters.(0) in
+    let parameters =
+      Array.to_list
+      @@ Array.sub parameters
+           (List.length variable_types + 1)
+           (List.length param_types)
+    in
     let parameters =
       List.map2
         (fun (name, _) param -> (name, param))
         scratch_function.parameters parameters
     in
     let entry = Llvm.append_block context "" f in
-    {parameters; f; ty; entry; scratch= scratch_function}
+    let sprite_state = {variables; sprite} in
+    {parameters; f; ty; entry; scratch= scratch_function; sprite_state}
 
   let param name f = List.assoc name f.parameters
 
-  let call f args =
+  let call f sprite_state args =
+    let state_args =
+      sprite_state.sprite
+      :: List.map (Fun.compose snd snd) sprite_state.variables
+    in
     let args =
-      List.map (fun (k, _) -> Parse.StringMap.find k args) f.parameters
+      state_args
+      @ List.map (fun (k, _) -> Parse.StringMap.find k args) f.parameters
     in
     Llvm.build_call f.ty f.f (Array.of_list args) "" builder
 
@@ -699,17 +739,16 @@ let assert_primitive = function
   | _ ->
       failwith "Unsupported type"
 
-let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
-    sprites scene e =
+let rec convert_expr cur_fn sprite_state funcs answer runtime_stage sprites
+    scene e =
   let convert_expr =
-    convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage sprites
-      scene
+    convert_expr cur_fn sprite_state funcs answer runtime_stage sprites scene
   in
   match e with
   | Argument (name, _) ->
       Function.param name cur_fn
   | Variable (name, _) -> (
-      let scratch_type, var = Parse.StringMap.find name vars in
+      let scratch_type, var = List.assoc name sprite_state.variables in
       let var =
         Llvm.build_load
           (Scratch_type.to_lltype (Scratch_type.Primitive scratch_type) context)
@@ -721,7 +760,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
       | _ ->
           var )
   | List (l, _) ->
-      let _, list = Parse.StringMap.find l vars in
+      let _, list = List.assoc l sprite_state.variables in
       Llvm.build_load (Llvm.pointer_type context) list "" builder
   | Literal lit ->
       assert_primitive lit |> create_literal
@@ -789,7 +828,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
       let e = convert_expr e in
       Llvm.build_not e "" builder
   | Index (l, e, _) -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let index = convert_expr e in
       match list_type with
@@ -800,7 +839,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
       | Boolean ->
           RuntimeFunction.call get_bool_vec_element [list; index] )
   | IndexOf (l, e) -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let value = convert_expr e in
       match list_type with
@@ -811,7 +850,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
       | Boolean ->
           RuntimeFunction.call index_of_bool [list; value] )
   | ListLength l -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       match list_type with
       | Scratch_type.Float ->
@@ -824,7 +863,7 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
       let e = convert_expr e in
       RuntimeFunction.call operator_length [e]
   | Contains c -> (
-      let list_type, list = Parse.StringMap.find c.list vars in
+      let list_type, list = List.assoc c.list sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let item = convert_expr c.item in
       match list_type with
@@ -865,11 +904,11 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
       in
-      RuntimeFunction.call sensing_touches_cursor [runtime_sprite; scene]
+      RuntimeFunction.call sensing_touches_cursor [sprite_state.sprite; scene]
   | XPosition ->
-      RuntimeFunction.call motion_get_x [runtime_sprite]
+      RuntimeFunction.call motion_get_x [sprite_state.sprite]
   | YPosition ->
-      RuntimeFunction.call motion_get_y [runtime_sprite]
+      RuntimeFunction.call motion_get_y [sprite_state.sprite]
   | MouseX ->
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
@@ -889,30 +928,30 @@ let rec convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage
         in
         RuntimeFunction.call looks_costume_name_of [sprite] )
   | Direction ->
-      RuntimeFunction.call motion_get_direction [runtime_sprite]
+      RuntimeFunction.call motion_get_direction [sprite_state.sprite]
   | CostumeNumber ->
-      RuntimeFunction.call looks_costume_number_of [runtime_sprite]
+      RuntimeFunction.call looks_costume_number_of [sprite_state.sprite]
   | CostumeName ->
-      RuntimeFunction.call looks_costume_name_of [runtime_sprite]
+      RuntimeFunction.call looks_costume_name_of [sprite_state.sprite]
   | BackdropNumber ->
-      RuntimeFunction.call looks_costume_number_of [runtime_stage]
+      RuntimeFunction.call looks_costume_number_of [sprite_state.sprite]
   | BackdropName ->
-      RuntimeFunction.call looks_costume_name_of [runtime_stage]
+      RuntimeFunction.call looks_costume_name_of [sprite_state.sprite]
 
-let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
-    runtime_sprite runtime_stage sprites scene stmt =
+let rec convert_statement cur_fn sprite_state funcs answer runtime_broadcasts
+    runtime_stage sprites scene stmt =
   let convert_expr =
-    convert_expr cur_fn vars funcs answer runtime_sprite runtime_stage sprites
-      scene
+    convert_expr cur_fn sprite_state funcs answer runtime_stage sprites scene
   in
   let convert_statement =
-    convert_statement cur_fn vars funcs answer runtime_broadcasts runtime_sprite
+    convert_statement cur_fn sprite_state funcs answer runtime_broadcasts
       runtime_stage sprites scene
   in
   match stmt with
   | FuncCall (name, args) ->
       let args = Parse.StringMap.map convert_expr args in
-      ignore @@ Function.call (Parse.StringMap.find name funcs) args
+      ignore
+      @@ Function.call (Parse.StringMap.find name funcs) sprite_state args
   | Broadcast b -> (
     match Parse.StringMap.find_opt b runtime_broadcasts with
     | Some b ->
@@ -939,10 +978,10 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       Llvm.position_at_end next_block builder
   | SetVariable (var, e) ->
       let value = convert_expr e in
-      let _, var = Parse.StringMap.find var vars in
+      let _, var = List.assoc var sprite_state.variables in
       ignore @@ Llvm.build_store value var builder
   | AddToList (l, e) -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let value = convert_expr e in
       ignore
@@ -955,7 +994,7 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       | Boolean ->
           RuntimeFunction.call push_to_bool_vec [list; value] )
   | DeleteAllOfList l -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       ignore
       @@
@@ -967,7 +1006,7 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       | Boolean ->
           RuntimeFunction.call clear_bool_vec [list] )
   | DeleteOfList (l, e) -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let index = convert_expr e in
       ignore
@@ -980,7 +1019,7 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       | Boolean ->
           RuntimeFunction.call data_deleteoflist_bool [list; index] )
   | InsertAtList {list; index; item} -> (
-      let list_type, list = Parse.StringMap.find list vars in
+      let list_type, list = List.assoc list sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let index = convert_expr index in
       let value = convert_expr item in
@@ -995,12 +1034,12 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
           RuntimeFunction.call data_insertatlist_bool [list; index; value] )
   | IncrVariable (var, e) ->
       let value = convert_expr e in
-      let _, var = Parse.StringMap.find var vars in
+      let _, var = List.assoc var sprite_state.variables in
       let current = Llvm.build_load (Llvm.type_of value) var "" builder in
       let new_value = Llvm.build_fadd current value "" builder in
       ignore @@ Llvm.build_store new_value var builder
   | SetIndex (l, i, e) -> (
-      let list_type, list = Parse.StringMap.find l vars in
+      let list_type, list = List.assoc l sprite_state.variables in
       let list = Llvm.build_load (Llvm.pointer_type context) list "" builder in
       let index = convert_expr i in
       let value = convert_expr e in
@@ -1060,26 +1099,29 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       ignore @@ Llvm.build_br loop builder ;
       Llvm.position_at_end next_block builder
   | Say e ->
-      ignore @@ RuntimeFunction.call looks_say [runtime_sprite; convert_expr e]
+      ignore
+      @@ RuntimeFunction.call looks_say [sprite_state.sprite; convert_expr e]
   | SayForSeconds s ->
       let msg = convert_expr s.message in
       let duration = convert_expr s.duration in
       ignore
       @@ RuntimeFunction.call looks_say_for_seconds
-           [runtime_sprite; msg; duration]
+           [sprite_state.sprite; msg; duration]
   | Think e ->
-      ignore @@ RuntimeFunction.call looks_think [runtime_sprite; convert_expr e]
+      ignore
+      @@ RuntimeFunction.call looks_think [sprite_state.sprite; convert_expr e]
   | ThinkForSeconds s ->
       let msg = convert_expr s.message in
       let duration = convert_expr s.duration in
       ignore
       @@ RuntimeFunction.call looks_think_for_seconds
-           [runtime_sprite; msg; duration]
+           [sprite_state.sprite; msg; duration]
   | SwitchCostume c ->
       let c = convert_expr c in
-      ignore @@ RuntimeFunction.call looks_switch_costume [runtime_sprite; c]
+      ignore
+      @@ RuntimeFunction.call looks_switch_costume [sprite_state.sprite; c]
   | NextCostume ->
-      ignore @@ RuntimeFunction.call looks_next_costume [runtime_sprite]
+      ignore @@ RuntimeFunction.call looks_next_costume [sprite_state.sprite]
   | SwitchBackdrop b ->
       let b = convert_expr b in
       ignore @@ RuntimeFunction.call looks_switch_costume [runtime_stage; b]
@@ -1087,14 +1129,15 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       ignore @@ RuntimeFunction.call looks_next_costume [runtime_stage]
   | ChangeSizeBy s ->
       let s = convert_expr s in
-      ignore @@ RuntimeFunction.call looks_change_size_by [runtime_sprite; s]
+      ignore
+      @@ RuntimeFunction.call looks_change_size_by [sprite_state.sprite; s]
   | SetSizeTo s ->
       let s = convert_expr s in
-      ignore @@ RuntimeFunction.call looks_set_size_to [runtime_sprite; s]
+      ignore @@ RuntimeFunction.call looks_set_size_to [sprite_state.sprite; s]
   | Show ->
-      ignore @@ RuntimeFunction.call looks_show [runtime_sprite]
+      ignore @@ RuntimeFunction.call looks_show [sprite_state.sprite]
   | Hide ->
-      ignore @@ RuntimeFunction.call looks_hide [runtime_sprite]
+      ignore @@ RuntimeFunction.call looks_hide [sprite_state.sprite]
   | GoForwardBackwardLayers (n, dir) ->
       let n = convert_expr n in
       let scene =
@@ -1106,7 +1149,7 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
              RuntimeFunction.call looks_go_forward_layers_by
          | Backward ->
              RuntimeFunction.call looks_go_back_layers_by )
-           [runtime_sprite; scene; n]
+           [sprite_state.sprite; scene; n]
   | GoToFrontBack dir ->
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
@@ -1117,62 +1160,66 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
              RuntimeFunction.call looks_go_to_front
          | Backward ->
              RuntimeFunction.call looks_go_to_back )
-           [runtime_sprite; scene]
+           [sprite_state.sprite; scene]
   | Ask e ->
       let question = convert_expr e in
       let result = RuntimeFunction.call ask [question] in
       ignore @@ Llvm.build_store result answer builder
   | SetX x ->
       let x = convert_expr x in
-      ignore @@ RuntimeFunction.call motion_set_x [runtime_sprite; x]
+      ignore @@ RuntimeFunction.call motion_set_x [sprite_state.sprite; x]
   | SetY y ->
       let y = convert_expr y in
-      ignore @@ RuntimeFunction.call motion_set_y [runtime_sprite; y]
+      ignore @@ RuntimeFunction.call motion_set_y [sprite_state.sprite; y]
   | ChangeX x ->
       let x = convert_expr x in
-      ignore @@ RuntimeFunction.call motion_change_x [runtime_sprite; x]
+      ignore @@ RuntimeFunction.call motion_change_x [sprite_state.sprite; x]
   | ChangeY y ->
       let y = convert_expr y in
-      ignore @@ RuntimeFunction.call motion_change_y [runtime_sprite; y]
+      ignore @@ RuntimeFunction.call motion_change_y [sprite_state.sprite; y]
   | GoToXY pos ->
       let x = convert_expr pos.x in
       let y = convert_expr pos.y in
-      ignore @@ RuntimeFunction.call motion_set_x [runtime_sprite; x] ;
-      ignore @@ RuntimeFunction.call motion_set_y [runtime_sprite; y]
+      ignore @@ RuntimeFunction.call motion_set_x [sprite_state.sprite; x] ;
+      ignore @@ RuntimeFunction.call motion_set_y [sprite_state.sprite; y]
   | GoTo "_random_" ->
       ignore
-      @@ RuntimeFunction.call motion_go_to_random_position [runtime_sprite]
+      @@ RuntimeFunction.call motion_go_to_random_position [sprite_state.sprite]
   | GoTo "_mouse_" ->
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
       in
-      ignore @@ RuntimeFunction.call motion_go_to_cursor [runtime_sprite; scene]
+      ignore
+      @@ RuntimeFunction.call motion_go_to_cursor [sprite_state.sprite; scene]
   | GoTo s ->
       let sprite = Parse.StringMap.find s sprites in
       let sprite =
         Llvm.build_load (Llvm.pointer_type context) sprite "" builder
       in
-      ignore @@ RuntimeFunction.call motion_go_to_sprite [runtime_sprite; sprite]
+      ignore
+      @@ RuntimeFunction.call motion_go_to_sprite [sprite_state.sprite; sprite]
   | TurnRight d ->
       let d = convert_expr d in
-      ignore @@ RuntimeFunction.call motion_turn_right [runtime_sprite; d]
+      ignore @@ RuntimeFunction.call motion_turn_right [sprite_state.sprite; d]
   | TurnLeft d ->
       let d = convert_expr d in
-      ignore @@ RuntimeFunction.call motion_turn_left [runtime_sprite; d]
+      ignore @@ RuntimeFunction.call motion_turn_left [sprite_state.sprite; d]
   | MoveSteps steps ->
       let steps = convert_expr steps in
-      ignore @@ RuntimeFunction.call motion_move_steps [runtime_sprite; steps]
+      ignore
+      @@ RuntimeFunction.call motion_move_steps [sprite_state.sprite; steps]
   | GlideToXY g ->
       let x = convert_expr g.x in
       let y = convert_expr g.y in
       let duration = convert_expr g.duration in
       ignore
-      @@ RuntimeFunction.call motion_glide_to_xy [runtime_sprite; x; y; duration]
+      @@ RuntimeFunction.call motion_glide_to_xy
+           [sprite_state.sprite; x; y; duration]
   | GlideTo {target= "_random_"; duration} ->
       let duration = convert_expr duration in
       ignore
       @@ RuntimeFunction.call motion_glide_to_random_position
-           [runtime_sprite; duration]
+           [sprite_state.sprite; duration]
   | GlideTo {target= "_mouse_"; duration} ->
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
@@ -1180,7 +1227,7 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       let duration = convert_expr duration in
       ignore
       @@ RuntimeFunction.call motion_glide_to_cursor
-           [runtime_sprite; scene; duration]
+           [sprite_state.sprite; scene; duration]
   | GlideTo {target= s; duration} ->
       let sprite = Parse.StringMap.find s sprites in
       let sprite =
@@ -1189,13 +1236,14 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       let duration = convert_expr duration in
       ignore
       @@ RuntimeFunction.call motion_glide_to_sprite
-           [runtime_sprite; sprite; duration]
+           [sprite_state.sprite; sprite; duration]
   | PointTowards "_mouse_" ->
       let scene =
         Llvm.build_load (Llvm.pointer_type context) scene "" builder
       in
       ignore
-      @@ RuntimeFunction.call motion_point_towards_cursor [runtime_sprite; scene]
+      @@ RuntimeFunction.call motion_point_towards_cursor
+           [sprite_state.sprite; scene]
   | PointTowards s ->
       let sprite = Parse.StringMap.find s sprites in
       let sprite =
@@ -1203,14 +1251,16 @@ let rec convert_statement cur_fn vars funcs answer runtime_broadcasts
       in
       ignore
       @@ RuntimeFunction.call motion_point_towards_sprite
-           [runtime_sprite; sprite]
+           [sprite_state.sprite; sprite]
   | IfOnEdgeBounce ->
-      ignore @@ RuntimeFunction.call motion_if_on_edge_bounce [runtime_sprite]
+      ignore
+      @@ RuntimeFunction.call motion_if_on_edge_bounce [sprite_state.sprite]
   | SetRotationStyle style ->
       let style = Rotation_style.to_int style in
       let style = Llvm.const_int (Llvm.i32_type context) style in
       ignore
-      @@ RuntimeFunction.call motion_set_rotation_style [runtime_sprite; style]
+      @@ RuntimeFunction.call motion_set_rotation_style
+           [sprite_state.sprite; style]
   | Warn e ->
       let msg = create_literal (String e) in
       ignore @@ RuntimeFunction.call warn [msg]
@@ -1287,7 +1337,9 @@ let init_sprite (sprite : sprite) =
 
 let convert_sprite answer globals broadcasts runtime_broadcasts scene
     (sprite : sprite) sprites runtime_stage =
-  let functions = Parse.StringMap.map Function.declare sprite.functions in
+  let functions =
+    Parse.StringMap.map (Function.declare sprite) sprite.functions
+  in
   let vars = Parse.StringMap.map init_variable sprite.variables in
   let vars =
     Parse.StringMap.union
@@ -1311,7 +1363,7 @@ let convert_sprite answer globals broadcasts runtime_broadcasts scene
   let on_clicks =
     List.map
       (fun code ->
-        let f = Function.declare {code; parameters= []} in
+        let f = Function.declare sprite {code; parameters= []} in
         let ptr = Function.func_ptr f in
         ignore
         @@ RuntimeFunction.call event_whenthisspriteclicked [runtime_sprite; ptr] ;
@@ -1331,8 +1383,8 @@ let convert_sprite answer globals broadcasts runtime_broadcasts scene
            Llvm.build_load (Llvm.pointer_type context) runtime_stage "" builder
          in
          List.iter
-           (convert_statement f vars functions answer runtime_broadcasts
-              runtime_sprite runtime_stage sprites scene )
+           (convert_statement f f.sprite_state functions answer
+              runtime_broadcasts runtime_stage sprites scene )
            scratch_f.code ;
          Llvm.build_ret_void builder )
        sprite.functions ;
@@ -1351,8 +1403,8 @@ let convert_sprite answer globals broadcasts runtime_broadcasts scene
             Llvm.build_load (Llvm.pointer_type context) runtime_stage "" builder
           in
           List.iter
-            (convert_statement broadcast vars functions answer
-               runtime_broadcasts runtime_sprite runtime_stage sprites scene )
+            (convert_statement broadcast broadcast.sprite_state functions answer
+               runtime_broadcasts runtime_stage sprites scene )
             broadcast.scratch.code ;
           ignore @@ Llvm.build_ret_void builder )
         broadcasts )
